@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+SPDX-License-Identifier: MIT-0 -->
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="author" content="Bill Dry">
+        <meta name="description" content="Tag your Roles">
+        <meta name="keywords" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <title>Tag your roles</title>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+    </head>    
+    <body>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            <span>{{ message }}</span>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+            <div class="container">
+                <div class="row">
+                <div class="col-12">
+                    <h3>Select your Role to tag</h3>
+                    <table class="table table-borderless">
+                        <tbody>
+                            <tr>
+                                <td>Please select an IAM Role from the list, below.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+        <form method="post" action="{{ url_for('set_roles_tags') }}">  
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>          
+                    <div class="form-group">
+                        <select class="custom-select" id="FormControlSelect1" name="roles_to_tag" size="10">
+                        {% for role_id in roles_inventory %}
+                            <option value="{{ role_id }}">{{ role_id }}</option>
+                        {% endfor %}
+                        </select>
+                    </div>
+                    <br>
+                    <h3>Now select your tags to apply</h3>
+                    <table class="table table-borderless">    
+                        <tbody>
+                            <tr>
+                                <td>Choose a tag key:value pair from every Tag Group dropdown, below, that you want to apply as a tag to your selected role</td>
+                            </tr>
+                        </tbody>
+                    </table>              
+                    {% for this_tag_group_info in tag_groups_all_info %}
+                    <div class="form-group">
+                        <select class="custom-select" id="FormControlSelect2" name="{{ this_tag_group_info[1] }}">
+                            <option  value="">Tag Group --> {{ this_tag_group_info[0] }}</option>
+                        {% for this_tag_group_value_option in this_tag_group_info[2] %}
+                            <option  value="{{ this_tag_group_value_option }}">{{ this_tag_group_info[1] }} : {{ this_tag_group_value_option }}</option>
+                        {% endfor %}
+                        </select>
+                    </div>
+                    {% endfor %}
+                </div>
+                </div>
+                <br>
+                    <p>Once you select an IAM role & associated tags, click the "Tag Selected Role" button, below.</p>
+                <br>
+                <button type="submit" class="btn btn-primary btn-lg">Tag Selected Role</button>
+            </div>
+        </form>
+        <br>
+        <span style="text-align:center;">
+            <form method="get" action="{{ url_for('actions') }}">
+                <button type="submit" class="btn btn-primary btn-lg">Home</button>
+                <button type="submit" class="btn btn-outline-primary btn-lg">Cancel</button>
+            </form>
+        </span>
+
+        <!-- Optional JavaScript -->
+        <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+        <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+
+    </body>
+</html>

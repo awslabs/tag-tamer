@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+SPDX-License-Identifier: MIT-0 -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="description" content="Tag Tamer Home Page" />
+    <meta name="keywords" content="" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>Tag Tamer - Home</title>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css"
+      integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk"
+      crossorigin="anonymous"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h3>Find, organize and update tags</h3>
+      <form method="get" action="{{ url_for('find_tags') }}">
+        <button type="submit" class="btn btn-primary btn-lg">
+          See your existing AWS resources & their tags
+        </button>
+      </form>
+    </div>
+    <br />
+    <div class="container">
+      <form method="get" action="{{ url_for('type_to_tag_group') }}">
+        <button type="submit" class="btn btn-primary btn-lg">
+          Manage your Tag Groups
+        </button>
+      </form>
+    </div>
+    <br />
+    <div class="container">
+      <form method="post" action="{{ url_for('select_resource_type') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="next_route" value="tag_filter" />
+        <button type="submit" class="btn btn-primary btn-lg">
+          Tag your existing AWS resources using your Tag Groups
+        </button>
+      </form>
+    </div>
+    <br />
+    <div class="container">
+      <h3>Enable and enforce tagging</h3>
+      <form method="get" action="{{ url_for('find_config_rules') }}">
+        <button type="submit" class="btn btn-primary btn-lg">
+          Assign your Tag Groups to AWS Config rules
+        </button>
+      </form>
+    </div>
+    <br />
+    <div class="container">
+      <form method="get" action="{{ url_for('select_roles_tags') }}">
+        <button type="submit" class="btn btn-primary btn-lg">
+          Enable role-based tagging
+        </button>
+      </form>
+    </div>
+    <br />
+    <div class="container">
+      <form method="get" action="{{ url_for('get_service_catalog') }}">
+        <button type="submit" class="btn btn-primary btn-lg">
+          Assign your Tag Groups to AWS Service Catalog products
+        </button>
+      </form>
+    </div>
+    <br />
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script
+      src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+      integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+      integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"
+      integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI"
+      crossorigin="anonymous"
+    ></script>
+  </body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+SPDX-License-Identifier: MIT-0 -->
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Select an AWS Resource Type</title>
+    <meta name="description" content="Select an AWS resource type" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css"
+      integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk"
+      crossorigin="anonymous"
+    />
+  </head>
+  <body>
+    <h3>Please select a resource type to tag</h3>
+    <br />
+    <div class="container">
+      <form method="post" action="{{ url_for(destination_route) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="ebsRadio"
+            value="ebs"
+            name="resource_type"
+            checked
+          />
+          <label class="form-check-label" for="ebsRadio">Amazon EBS Volumes</label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="ec2Radio"
+            value="ec2"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="ec2Radio">Amazon EC2 Instances</label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="eksRadio"
+            value="eks"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="eksRadio">Amazon EKS Clusters</label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="lambdaRadio"
+            value="lambda"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="ec2Radio">AWS Lambda Functions</label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="bucketRadio"
+            value="s3"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="bucketRadio">Amazon S3 Buckets</label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg">
+          Tag Resources
+        </button>
+      </form>
+    </div>
+    <br />
+    <br />
+    <br />
+    <div class="container">
+      <form method="get" action="{{ url_for('actions') }}">
+        <button type="submit" class="btn btn-primary btn-lg">Home</button>
+        <button type="submit" class="btn btn-outline-primary btn-lg">
+          Cancel
+        </button>
+      </form>
+    </div>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script
+      src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+      integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+      integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"
+      integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI"
+      crossorigin="anonymous"
+    ></script>
+  </body>
+</html>

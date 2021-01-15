@@ -1,0 +1,13 @@
+[Unit]
+Description=Gunicorn instance to serve tag-tamer
+After=network.target
+
+[Service]
+User=ec2-user
+Group=adm
+WorkingDirectory=/home/ec2-user/tag-tamer
+Environment="PATH=/home/ec2-user/tag-tamer/prod/bin"
+ExecStart=/home/ec2-user/tag-tamer/prod/bin/gunicorn --workers 1 --threads 3 tag-tamer-run:app
+
+[Install]
+WantedBy=multi-user.target

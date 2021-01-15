@@ -1,6 +1,6 @@
 # How to install the Tag Tamer solution
 
-Version - 5
+Version - 4
 
 Author: Bill Dry 
 

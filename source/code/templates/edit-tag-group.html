@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+SPDX-License-Identifier: MIT-0 -->
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="author" content="Bill Dry">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Edit Your Tag Group</title>
+        <meta name="description" content="Edit your Tag Group">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+    </head>
+    <body>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            <span>{{ message }}</span>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+        <form method="post" action="{{ url_for('add_update_tag_group') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        {% if selected_tag_group_attributes %}
+            {% set selected_tag_group_key_name = selected_tag_group_attributes["tag_group_key"] %}
+            <span style="font-size:200%;">This Tag Group's Name: </span><span style="font-size:200%;color:MediumSeaGreen;">"{{ selected_tag_group_name }}"</span>
+            <input type="hidden" name="selected_tag_group_name" value="{{ selected_tag_group_name }}">
+            <br>
+            <br>
+            <span style="font-size:200%;">This Tag Group's Key: </span><span style="font-size:200%;color:MediumSeaGreen;">"{{ selected_tag_group_key_name }}"</span>
+            <input type="hidden" name="selected_tag_group_key_name" value="{{ selected_tag_group_key_name }}">
+            <br>
+            <br>
+            <p style="font-size:150%;">Please select from these existing Tag Group values & found tag values to update this Tag Group's range of possible tag values</p>
+            <br>
+            <div class="container">
+                
+                    <table style="width:400px" class="table table-bordered table-striped">
+                        <thead>
+                            <th scope="col">Select</th>
+                            <th scope="col">This Tag Group's Existing Tag Values</th>
+                        </thead>
+                        <tbody>
+                    {% if selected_tag_group_attributes["tag_group_values"] %}
+                        {% for value in selected_tag_group_attributes["tag_group_values"] %}
+                            <tr>
+                                <td style="text-align:center;"><input  type="checkbox" id="{{ value }}" value="checked" name="{{ value }}" checked></td>
+                                <td><label class="form-check-label" for="{{ value }}">{{ value }}</label></td>
+                            </tr>                      
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td style="text-align:center;">N/A</td><td>This Tag Group has no existing values</td>
+                        </tr>
+                    {% endif %}
+                        </tbody>
+                    </table>
+                    <br>
+        {% else %}
+            <span style="font-size:200%;"><label for="new-tag-group-name">This new Tag Group's name is:</label></span>
+            <span style="font-size:200%;color:MediumSeaGreen;"><input type="text" class="form-control" id="new-tag-group-name" name="new_tag_group_name" value="{{ selected_tag_group_name }}"></span>
+            <br>
+            <span style="font-size:200%;"><label for="new-tag-group-key-name">Please enter this new Tag Group's tag key:</label></span>
+            <span style="font-size:200%;color:MediumSeaGreen;"><input type="text" class="form-control" id="new-tag-group-key-name" name="new_tag_group_key_name" value="{{ selected_tag_group_name }}"></span>
+            <br>
+            <p style="font-size:150%;">Please select from these found tag values from resource type you selected to update this Tag Group's range of possible tag values</p>
+            <br>        
+        {% endif %}
+                    <table style="width:500px" class="table table-bordered table-striped">
+                        <thead>
+                            <th scope="col">Select</th>
+                            <th scope="col">Found Tag Values for Chosen Resource Type</th>
+                        </thead>
+                        <tbody>
+                            {% for found_value in selected_resource_type_tag_values_inventory %}
+                                <tr>
+                                    <td style="text-align:center;"><input  type="checkbox" id="{{ found_value }}" value="checked" name="{{ found_value }}"></td>
+                                    <td><label class="form-check-label" for="{{ found_value }}">{{ found_value }}</label></td>
+                                </tr> 
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                <br>
+                <h4>or enter new tag value options for this Tag Group</h4>
+                <br>
+                <label for="new-tag-group">New tag value options to add  (separate values using commas, Up to 255 characters per value including spaces)</label>
+                <input type="text" class="form-control" id="new-tag-group" name="new_tag_group_values">
+                <br>
+                <br>
+                    <input type="hidden" name="resource_type" value="{{ resource_type }}">
+                    <button type="submit" class="btn btn-primary btn-lg">Update Tag Group</button>
+        </form>
+            </div>
+                <br>
+                <br>
+                <div class="container">
+                    <form method="get" action="{{ url_for('actions') }}">
+                        <button type="submit" class="btn btn-primary btn-lg">Home</button>
+                        <button type="submit" class="btn btn-outline-primary btn-lg">Cancel</button>
+                    </form>
+                </div>  
+    
+        <!-- Optional JavaScript -->
+        <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+        <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+  
+    </body>
+    </html>
