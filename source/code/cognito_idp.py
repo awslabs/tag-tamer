@@ -20,7 +20,7 @@ import sys
 
 log = logging.getLogger(__name__)
 
-# Function to return the authenticated user's user pool group ARN's
+# Function to return the authenticated user's user pool group IAM role ARN's
 def get_user_group_arns(user_name, user_pool_id, region):
     try:
         my_status = execution_status()
@@ -30,9 +30,9 @@ def get_user_group_arns(user_name, user_pool_id, region):
             Username=user_name,
             UserPoolId=user_pool_id
         )
-        # initially support one Cognito user pool group per user
+        # Initially support one Cognito user pool group IAM role ARN per user
         group_role_arn = cognito_idp_groups['Groups'][0]['RoleArn'] if cognito_idp_groups.get('Groups') else False
-        my_status.success(message='Retrieved user permissions!')
+        my_status.success(message='Retrieved IAM role ARN assign to user.')
     except botocore.exceptions.ClientError as error:
         log.error("Boto3 API returned error. function: {} - {}".format(sys._getframe().f_code.co_name, error))
         my_status.error()

@@ -21,7 +21,7 @@ source_template_dir="$PWD"
 dist_dir="$source_template_dir/open-source"
 dist_template_dir="$dist_dir/deployment"
 source_dir="$source_template_dir/../source"
-github_dir="$source_template_dir/../.github"
+#github_dir="$source_template_dir/../.github"
 
 echo "------------------------------------------------------------------------------"
 echo "[Init] Clean old open-source folder"
@@ -36,9 +36,10 @@ mkdir -p $dist_template_dir
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Templates"
 echo "------------------------------------------------------------------------------"
-echo "cp $source_template_dir/*.template $dist_template_dir/"
-cp $source_template_dir/*.template $dist_template_dir/
+#echo "cp $source_template_dir/*.template $dist_template_dir/"
+#cp $source_template_dir/*.template $dist_template_dir/
 echo "copy yaml templates and rename"
+echo "cp $source_template_dir/*.yaml $dist_template_dir/"
 cp $source_template_dir/*.yaml $dist_template_dir/
 cd $dist_template_dir
 # Rename all *.yaml to *.template
@@ -54,11 +55,11 @@ cp $source_template_dir/build-s3-dist.sh $dist_template_dir
 echo "cp $source_template_dir/run-unit-tests.sh $dist_template_dir"
 cp $source_template_dir/run-unit-tests.sh $dist_template_dir
 
-echo "------------------------------------------------------------------------------"
-echo "[Packing] GitHub templates"
-echo "------------------------------------------------------------------------------"
-echo "cp -r $github_dir $dist_dir"
-cp -r $github_dir $dist_dir
+#echo "------------------------------------------------------------------------------"
+#echo "[Packing] GitHub templates"
+#echo "------------------------------------------------------------------------------"
+#echo "cp -r $github_dir $dist_dir"
+#cp -r $github_dir $dist_dir
 
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Source Folder"

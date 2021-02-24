@@ -6,7 +6,6 @@ SPDX-License-Identifier: MIT-0 -->
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <title>Select the Resource Type</title>
-        <meta name="author" content="Bill Dry">
         <meta name="description" content="Create tag groups for a resource type">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
@@ -27,11 +26,15 @@ SPDX-License-Identifier: MIT-0 -->
             </div>
             <div class="form-check">
                 <input class="form-check-input" type="radio" id="eksRadio" value="eks" name="resource_type">
-                    <label class="form-check-label" for="ec2Radio">Amazon EKS Clusters</label>
+                    <label class="form-check-label" for="eksRadio">Amazon EKS Clusters</label>
             </div>
             <div class="form-check">
                 <input class="form-check-input" type="radio" id="lambdaRadio" value="lambda" name="resource_type">
                     <label class="form-check-label" for="lambdaRadio">AWS Lambda Functions</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" id="rdsRadio" value="rds" name="resource_type">
+                    <label class="form-check-label" for="rdsRadio">Amazon RDS Clusters</label>
             </div>
             <div class="form-check">
                 <input class="form-check-input" type="radio" id="bucketRadio" value="s3" name="resource_type">

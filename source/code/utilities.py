@@ -4,6 +4,13 @@
 # SPDX-License-Identifier: MIT-0
 # Tag Tamer utility functions
 
+# Import AWS modules for python
+import boto3
+import boto3.session
+import botocore
+from botocore import exceptions
+from botocore.exceptions import ClientError
+
 import json
 import time
 import urllib.request
@@ -11,9 +18,21 @@ from jose import jwk, jwt
 from jose.utils import base64url_decode
 # Import logging module
 import logging
+# Import the systems module to get interpreter data
+import sys
 
 log = logging.getLogger(__name__)
 
+# Returns a list of all AWS regions
+def get_aws_regions():
+    my_session = boto3.session.Session(region_name='us-east-1')
+    try:
+        available_regions = my_session.get_available_regions(service_name='ec2', partition_name='aws')
+    except botocore.exceptions.ClientError as error:
+        log.error("Boto3 API returned error. function: {} - {}".format(sys._getframe().f_code.co_name, error))
+        available_regions = False
+    return available_regions
+    
 # Return the Boto3 resource type & unit to the caller
 def get_resource_type_unit(type):
     if type:
@@ -29,6 +48,9 @@ def get_resource_type_unit(type):
         elif type == "lambda":
             resource_type = 'lambda'
             unit = 'functions'
+        elif type == "rds":
+            resource_type = 'rds'
+            unit = 'rdsclusters'
         elif type == "s3":
             resource_type = 's3'
             unit = 'buckets'

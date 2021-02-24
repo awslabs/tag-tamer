@@ -5,7 +5,6 @@ SPDX-License-Identifier: MIT-0 -->
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <meta name="author" content="Bill Dry">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <title>Your Updated Tags</title>
         <meta name="description" content="Format & display updated tags">
@@ -26,36 +25,49 @@ SPDX-License-Identifier: MIT-0 -->
         {% endif %}
         {% endwith %}
         <br>
-        {% if inventory %}
+        {% if all_updated_inventory %}
         <h3>Here are your selected resources with updated tags</h3>
         <br>
-        <table style="width:800px" class="table table-bordered table-striped">
-            {% for instance, tags in inventory.items() %}
+        <table style="width: 800px" class="table table-bordered table-striped">
+            {% for account_number, per_account_inventory in all_updated_inventory.items() %}
+              {% for region, region_inventory in per_account_inventory.items() %}
+                {% for instance, tags in region_inventory.items() %}
                 <tr>
-                        <thead>
-                        <th scope="col">Resource ID</th>
-                        <th scope="col">Found Tags</th>
-                        </thead>
-                        <td>{{ instance }}</td>
-                            <td><table style="width:600px" class="table table-sm table-bordered table-striped">
-                                 <thead>
-                                    <tr>
-                                    <th scope="col">Found Tag Key</th>
-                                    <th scope="col">Found Tag Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                {% for found_key, found_value in tags.items() %}
-                                    <tr>
-                                        <td>{{ found_key }}</td><td>{{ found_value }}</td>
-                                    </tr>
-                                {% endfor %}
-                                </tbody>
-                                </table>
-                            </td>
+                  <thead>
+                    <th scope="col">Account Number</th>
+                    <th scope="col">Region</th>
+                    <th scope="col">Resource ID</th>
+                    <th scope="col">Found Tags</th>
+                  </thead>
+                  <td>{{ account_number }}</td>
+                  <td>{{ region }}</td>
+                  <td>{{ instance }}</td>
+                  <td>
+                    <table
+                      style="width: 600px"
+                      class="table table-sm table-bordered table-striped"
+                    >
+                      <thead>
+                        <tr>
+                          <th scope="col">Found Tag Key</th>
+                          <th scope="col">Found Tag Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for found_key, found_value in tags.items() %}
+                        <tr>
+                          <td>{{ found_key }}</td>
+                          <td>{{ found_value }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </td>
                 </tr>
                 {% endfor %}
-        </table>
+              {% endfor %}
+            {% endfor %}
+          </table>
         {% endif %}
     
         <div class="container">

@@ -19,18 +19,6 @@ SPDX-License-Identifier: MIT-0 -->
     />
   </head>
   <body>
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    {% for category, message in messages %}
-    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-        <span>{{ message }}</span>
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-    </div>
-    {% endfor %}
-    {% endif %}
-    {% endwith %}
     <div class="container-fluid">
       <h3 style="text-align: center">
         Select any tag keys & values to use as search filters then press submit; otherwise, just press submit. 
@@ -40,7 +28,7 @@ SPDX-License-Identifier: MIT-0 -->
         <div class="col-3"></div>
         <div class="col-3">
           <h4 style="text-align: center"> Tag key</h4>
-          <form method="post" action="{{ url_for('tag_resources') }}" target="tag_apply_bottom_iframe">
+          <form method="post" action="{{ url_for(destination_route) }}" target="tag_bottom_iframe">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="resource_type" value="{{ resource_type }}" />
           <div class="form-group">

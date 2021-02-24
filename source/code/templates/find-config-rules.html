@@ -4,7 +4,6 @@ SPDX-License-Identifier: MIT-0 -->
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <meta name="author" content="Bill Dry">
         <meta name="description" content="Locate AWS Config rules">
         <meta name="keywords" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -65,14 +64,36 @@ SPDX-License-Identifier: MIT-0 -->
                                 <td>Select the Rule(s) you would like to apply Tag Groups to</td>
                             </tr>
                         </tbody>
-                    </table>              
-                    <div class="form-group">
-                        <select multiple class="custom-select" id="FormControlSelect2" name="chosen_config_rule_ids" size="10">
-                        {% for config_rule_id, config_rule_name in config_rules_ids_names.items() %}
-                            <option  value="{{ config_rule_id }}">{{ config_rule_name }}</option>
+                    </table> 
+                    {% for account_number, per_account_inventory in all_resource_inventory.items() %}
+                        {% for region, resource_inventory in per_account_inventory.items() %}
+                            <h5 style="text-align:center;">AWS account: <span style="color:MediumSeaGreen;">{{ account_number }}</span></h5>    
+                            <table style="table-layout:fixed; width:100%;" class="table table-striped table-hover">
+                            <colgroup>
+                                <col span="1" style="width:10%">
+                                <col span="1" style="width:30%">
+                                <col span="1" style="width:60%">
+                            </colgroup>    
+                                <tbody>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col" style="text-align:center;vertical-align:middle;">Tag it?</th>
+                                            <th scope="col" style="text-align:center;vertical-align:middle;">Region</th>
+                                            <th scope="col" style="text-align:center;vertical-align:middle;">Config Rule Name</th>
+                                        </tr>
+                                    </thead>
+                                    {% for config_rule_id, config_rule_name in resource_inventory.items() %}
+                                        <tr>
+                                                <td style="text-align:center;vertical-align:middle;"><input class="form-check-input" type="checkbox" name="resource,{{ account_number }},{{ region }},{{ config_rule_id }}" value="{{ config_rule_name }}" style="line-height:normal;margin:0;"></td>
+                                                <td style="text-align:center;vertical-align:middle;">{{ region }}</td>
+                                                <td style="text-align:left;vertical-align:middle;word-wrap:break-word;">{{ config_rule_name }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            <br>
                         {% endfor %}
-                        </select>
-                    </div>
+                    {% endfor %}             
                 </div>
                 </div>
                 <button type="submit" class="btn btn-primary btn-lg">Apply Tag Groups</button>

@@ -1,6 +1,6 @@
 # How to install the Tag Tamer solution
 
-Version - 5
+Version - 6
 
 Author: Bill Dry 
 
@@ -12,7 +12,7 @@ __a)__ Identity the target AWS account where you would like to deploy Tag Tamer
 
 __b)__ Identify the EC2 Key Pair you will use to access the Tag Tamer Web App EC2 instance ("Web App")
 
-__c)__ Identify the IAM role that AWS CloudFormation will use to deploy DynamoDB, EC2 & IAM resources
+__c)__ Identify the IAM role within your target AWS account is prerequisite __a)__ that AWS CloudFormation will use to deploy DynamoDB, EC2 & IAM resources into the target account to operate the Web App.
 
 __d)__ Identify the X.509 certificate to use for ALB if loadbalancer needs to be deployed in public subnet. If you plan to install a self-signed certificate, instructions are provided below.
 

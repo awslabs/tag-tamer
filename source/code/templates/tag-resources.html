@@ -4,7 +4,6 @@ SPDX-License-Identifier: MIT-0 -->
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <meta name="author" content="Bill Dry">
         <meta name="description" content="Tag your resources">
         <meta name="keywords" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -19,23 +18,52 @@ SPDX-License-Identifier: MIT-0 -->
                         <table class="table table-borderless">
                             <tbody>
                                 <tr>
-                                    <td>Hold down the Control key to select multiple AWS resources to tag from the list, below.</td>
-                                </tr>
-                                <tr>
-                                    <td>Resource name -- Resource ID</td>
+                                    <td>Check the box beside every resource you want to tag.</td>
                                 </tr>
                             </tbody>
                         </table>
 
-                        <form method="post" action="{{ url_for('apply_tags_to_resources') }}">  
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>          
-                                    <div class="form-group">
-                                        <select multiple class="custom-select" id="FormControlSelect1" name="resources_to_tag" size="10">
-                                        {% for id_name in resource_inventory %}
-                                            <option  value="{{ id_name[0] }}">{{ id_name[1] }}  --  {{ id_name[0] }}</option>
+                        <form method="post" action="{{ url_for('apply_tags_to_resources') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            {% for filter_key, filter_value in filter_elements.items() %}
+                                <input type="hidden" name="{{ filter_key }}" value="{{ filter_value }}"/>
+                            {% endfor %}
+                                    <div class="form-check">
+                                        {% for account_number, per_account_inventory in all_resource_inventory.items() %}
+                                            {% for region, resource_inventory in per_account_inventory.items() %}
+                                                <h5 style="text-align:center;">AWS account: <span style="color:MediumSeaGreen;">{{ account_number }}</span></h5>    
+                                                <table style="table-layout:fixed; width:100%;" class="table table-striped table-hover">
+                                                <colgroup>
+                                                    <col span="1" style="width:5%">
+                                                    <col span="1" style="width:15%">
+                                                    <col span="1" style="width:25%">
+                                                    <col span="1" style="width:55%">
+                                                </colgroup>    
+                                                    <tbody>
+                                                        <thead>
+                                                            <tr>
+                                                                <th scope="col" style="text-align:center;vertical-align:middle;">Tag it?</th>
+                                                                <th scope="col" style="text-align:center;vertical-align:middle;">Region</th>
+                                                                <th scope="col" style="text-align:center;vertical-align:middle;">Resource name</th>
+                                                                <th scope="col" style="text-align:center;vertical-align:middle;">Resource ID</th>
+                                                            </tr>
+                                                        </thead>
+                                                        {% for id_name in resource_inventory %}
+                                                            <tr>
+                                                                    <td style="text-align:center;vertical-align:middle;"><input class="form-check-input" type="checkbox" name="resource,{{ account_number }},{{ region }},{{ id_name[0] }}" value="{{ id_name[0] }}" style="line-height:normal;margin:0;"></td>
+                                                                    <!-- <label class="form-check-label" for="{{ region }},{{ id_name[0] }}" id="{{ region }},{{ id_name[0] }}">{{ id_name[1] }}  --  {{ id_name[0] }}</label></td> -->
+                                                                    <td style="text-align:center;vertical-align:middle;">{{ region }}</td>
+                                                                    <td style="text-align:left;vertical-align:middle;word-wrap:break-word;">{{ id_name[1] }}</td>
+                                                                    <td style="text-align:left;vertical-align:middle;word-wrap:break-word;">{{ id_name[0] }}</td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                                <br>
+                                            {% endfor %}
                                         {% endfor %}
-                                        </select>
                                     </div>
+                            <br>
                             <p>Once you select your resources & tags, click the "Tag Selected Resources" button, below.</p>
                             <br>
                             <div class="text-center">
@@ -51,7 +79,11 @@ SPDX-License-Identifier: MIT-0 -->
                                     <td>Choose a tag key:value pair from every Tag Group dropdown, below, you want to apply as a tag to your selected resource(s)</td>
                                 </tr>
                             </tbody>
-                        </table>              
+                        </table>
+                        <table class="table table-borderless">    
+                            <tbody>
+                                <tr>
+                                    <td>            
                         {% for this_tag_group_info in tag_groups_all_info %}
                         <div class="form-group">
                             <select class="custom-select" id="FormControlSelect2" name="{{ this_tag_group_info[1] }}">
@@ -62,6 +94,10 @@ SPDX-License-Identifier: MIT-0 -->
                             </select>
                         </div>
                         {% endfor %}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                     </form>
                 </div>

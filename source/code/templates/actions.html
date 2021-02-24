@@ -21,7 +21,9 @@ SPDX-License-Identifier: MIT-0 -->
   <body>
     <div class="container">
       <h3>Find, organize and update tags</h3>
-      <form method="get" action="{{ url_for('find_tags') }}">
+      <form method="post" action="{{ url_for('select_resource_type') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="next_route" value="found_tags" />
         <button type="submit" class="btn btn-primary btn-lg">
           See your existing AWS resources & their tags
         </button>
@@ -39,7 +41,7 @@ SPDX-License-Identifier: MIT-0 -->
     <div class="container">
       <form method="post" action="{{ url_for('select_resource_type') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-        <input type="hidden" name="next_route" value="tag_filter" />
+        <input type="hidden" name="next_route" value="tag_resources" />
         <button type="submit" class="btn btn-primary btn-lg">
           Tag your existing AWS resources using your Tag Groups
         </button>

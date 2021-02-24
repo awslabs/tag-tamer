@@ -47,16 +47,21 @@ class eks_clusters_tags:
         tag_value1_state = True if self.filter_tags.get('tag_value1') else False
         tag_key2_state = True if self.filter_tags.get('tag_key2') else False
         tag_value2_state = True if self.filter_tags.get('tag_value2') else False
+        if not self.filter_tags.get('conjunction'):
+            self.filter_tags['conjunction'] = 'AND'
         resource_inventory = dict()
 
-        self.session_credentials = {}
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.session_credentials = dict()
+        self.session_credentials = session_credentials
+        
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
 
         def _intersection_union_invalid(tag_dict, cluster_name, cluster_arn):
             resource_inventory['No matching resource'] = 'No matching resource'
@@ -124,7 +129,7 @@ class eks_clusters_tags:
             }
                 
             try:
-                client = this_session.client(self.resource_type, region_name=self.region)
+                #client = this_session.client(self.resource_type, region_name=self.region)
                 # Get all the EKS Clusters in the region
                 my_clusters = client.list_clusters()
                 for item in my_clusters['clusters']:
@@ -142,10 +147,14 @@ class eks_clusters_tags:
                                 my_status.error(message='You are not authorized to view these resources')
                             else:
                                 my_status.error()
-                    intersection_combos[(tag_key1_state,
-                        tag_value1_state,
-                        tag_key2_state,
-                        tag_value2_state)](response.get('tags'), item, eks_cluster_arn )
+                    if response.get('tags'):
+                        intersection_combos[(tag_key1_state,
+                            tag_value1_state,
+                            tag_key2_state,
+                            tag_value2_state)](response.get('tags'), item, eks_cluster_arn )
+                    elif self.filter_tags.get('tag_key1') == '<No tags applied>' or \
+                        self.filter_tags.get('tag_key2') == '<No tags applied>':
+                        resource_inventory[eks_cluster_arn] = item
                 my_status.success(message='Resources and tags found!')    
             except botocore.exceptions.ClientError as error:
                 log.error("Boto3 API returned error: {}".format(error))
@@ -219,7 +228,7 @@ class eks_clusters_tags:
             }
                 
             try:
-                client = this_session.client(self.resource_type, region_name=self.region)
+                #client = this_session.client(self.resource_type, region_name=self.region)
                 # Get all the EKS Clusters in the region
                 my_clusters = client.list_clusters()
                 for item in my_clusters['clusters']:
@@ -231,11 +240,15 @@ class eks_clusters_tags:
                         response = client.list_tags_for_resource(
                             resourceArn=eks_cluster_arn
                         )
-                        or_combos[(tag_key1_state,
-                            tag_value1_state,
-                            tag_key2_state,
-                            tag_value2_state)](response.get('tags'), item, eks_cluster_arn)
-                    
+                        if response.get('tags'):
+                            or_combos[(tag_key1_state,
+                                tag_value1_state,
+                                tag_key2_state,
+                                tag_value2_state)](response.get('tags'), item, eks_cluster_arn)
+                        elif self.filter_tags.get('tag_key1') == '<No tags applied>' or \
+                            self.filter_tags.get('tag_key2') == '<No tags applied>':
+                            resource_inventory[eks_cluster_arn] = item
+
                     except botocore.exceptions.ClientError as error:
                             log.error("Boto3 API returned error: {}".format(error))
                             if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':
@@ -250,55 +263,53 @@ class eks_clusters_tags:
                 else:
                     my_status.error()
             
-        # Sort the resources based on the resource's name
-        ordered_inventory = OrderedDict()
-        ordered_inventory = sorted(resource_inventory.items(), key=lambda item: item[1])  
-        return ordered_inventory, my_status.get_status()       
+        return resource_inventory, my_status.get_status()      
 
 
     # method - get_eks_clusters_tags
     # Returns a nested dictionary of every resource & its key:value tags for the chosen resource type
     # No input arguments
-    def get_eks_clusters_tags(self, **session_credentials):
+    def get_eks_clusters_tags(self, chosen_resources, **session_credentials):
         my_status = execution_status()
         # Instantiate dictionaries to hold resources & their tags
         tagged_resource_inventory = dict()
 
         self.session_credentials = dict()
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.session_credentials = session_credentials
+        
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
 
         try:
-            client = this_session.client(self.resource_type, region_name=self.region)
-            # Get all the EKS Clusters in the region
-            my_clusters = client.list_clusters()
-            if len(my_clusters['clusters']) == 0:
-                tagged_resource_inventory["No Resource Found"] = {"No Tags Found": "No Tags Found"}
-                my_status.warning(message='No Amazon EKS clusters found!')
-            else:
-                for item in my_clusters['clusters']:
-                    resource_tags = {}
+            if chosen_resources[0][0] != "No matching resources found":
+                for resource_id_name in chosen_resources:
+                    resource_tags = dict()
                     eks_cluster_arn= client.describe_cluster(
-                        name=item 
+                        name=resource_id_name[1] 
                         )['cluster']['arn']
                     try: 
                         response = client.list_tags_for_resource(
                             resourceArn= eks_cluster_arn
                             )
-                        try:
+                        if response.get('tags'):
+                            user_applied_tags = False
                             for tag_key, tag_value in response['tags'].items():
                                 if not re.search("^aws:", tag_key):
                                     resource_tags[tag_key]= tag_value
-                        except:
-                            resource_tags[tag_key] = "No tag values found"
+                                    user_applied_tags = True
+                            if not user_applied_tags:
+                                resource_tags['No user-applied tag keys found'] = 'No user-applied tag values found'
+                        else:
+                            resource_tags["No user-applied tag keys found"] = "No user-applied tag values found"
                     except botocore.exceptions.ClientError as error:
                         log.error("Boto3 API returned error: {}".format(error))
-                        resource_tags["No Tags Found"] = "No Tags Found"
+                        resource_tags["No tags found"] = "No tags found"
                         if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':
                             my_status.error(message='You are not authorized to view these resources')
                         else:
@@ -306,9 +317,12 @@ class eks_clusters_tags:
                     sorted_resource_tags = OrderedDict(sorted(resource_tags.items()))
                     tagged_resource_inventory[eks_cluster_arn] = sorted_resource_tags
                     my_status.success(message='Resources and tags found!')
+            else:
+                tagged_resource_inventory["No Resource Found"] = {"No Tag Keys Found": "No Tag Values Found"}
+                my_status.warning(message='No Amazon EKS clusters found!')
         except botocore.exceptions.ClientError as error:
             log.error("Boto3 API returned error: {}".format(error))
-            tagged_resource_inventory["No Resource Found"] = {"No Tags Found": "No Tags Found"}
+            tagged_resource_inventory["No Resource Found"] = {"No Tag Keys Found": "No Tag Values Found"}
             if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':
                 my_status.error(message='You are not authorized to view these resources')
             else:
@@ -323,20 +337,22 @@ class eks_clusters_tags:
         tag_keys_inventory = list()
 
         self.session_credentials = dict()
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.session_credentials = session_credentials
+        
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
 
         try:
-            client = this_session.client(self.resource_type, region_name=self.region)
+            #client = this_session.client(self.resource_type, region_name=self.region)
             # Get all the EKS clusters in the region
             my_clusters = client.list_clusters()
             if len(my_clusters['clusters']) == 0:
-                tag_keys_inventory.append("No tag keys found")
                 my_status.warning(message='No Amazon EKS clusters found!')
             else:
                 for item in my_clusters['clusters']:
@@ -348,29 +364,32 @@ class eks_clusters_tags:
                         response = client.list_tags_for_resource(
                             resourceArn=cluster_arn
                         )
-                        try:
+                        if len(response.get('tags')):
                             # Add all tag keys to the list
-                            for tag_key, _ in response['Tags'].items():       
+                            for tag_key, _ in response['tags'].items():       
                                 if not re.search("^aws:", tag_key):
                                     tag_keys_inventory.append(tag_key)
-                            my_status.success(message='Resources and tags found!')
-                        except:
-                            tag_keys_inventory.append("No tag keys found")
-                            my_status.error(message='You are not authorized to view these resources')
                     except botocore.exceptions.ClientError as error:
                         log.error("Boto3 API returned error: {}".format(error))
-                        tag_keys_inventory.append("No tag keys found")
                         if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                        
                             my_status.error(message='You are not authorized to view these resources')
                         else:
                             my_status.error()
+                        return tag_keys_inventory, my_status.get_status()
+
+            # Set success if tag values found else set warning
+            if len(tag_keys_inventory):
+                my_status.success(message='Tag keys found!')
+            else:
+                my_status.warning(message='No tag keys found for this resource type.')
+
         except botocore.exceptions.ClientError as error:
             log.error("Boto3 API returned error: {}".format(error))
-            tag_keys_inventory.append("No tag keys found")
             if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                
                 my_status.error(message='You are not authorized to view these resources')
             else:
                 my_status.error()
+            return tag_keys_inventory, my_status.get_status()
 
         #Remove duplicate tags & sort
         tag_keys_inventory = list(set(tag_keys_inventory))
@@ -387,55 +406,70 @@ class eks_clusters_tags:
         tag_values_inventory = list()
 
         self.session_credentials = dict()
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.session_credentials = session_credentials
+        
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
 
         try:
-            client = this_session.client(self.resource_type, region_name=self.region)
+            #client = this_session.client(self.resource_type, region_name=self.region)
             # Get all the EKS clusters in the region
             my_clusters = client.list_clusters()
             if len(my_clusters['clusters']) == 0:
-                tag_values_inventory.append("No tag values found")
+                #tag_values_inventory.append("No tag values found")
                 my_status.warning(message='No Amazon EKS clusters found!')
             else:
                 for item in my_clusters['clusters']:
-                    cluster_arn = client.describe_cluster(
-                        name=item
-                    )['cluster']['arn']
                     try:
-                        # Get all the tags for a given EKS Cluster
-                        response = client.list_tags_for_resource(
-                            resourceArn=cluster_arn
+                        response = client.describe_cluster(
+                            name=item
                         )
+                        cluster_arn = response['cluster']['arn']
                         try:
-                            # Add all tag keys to the list
-                            for tag_key, tag_value in response['Tags'].items():       
-                                # Exclude any AWS-applied tags which begin with "aws:"
-                                if not re.search("^aws:", tag_key):
-                                    tag_values_inventory.append(tag_value)
-                                    my_status.success(message='Resources and tags found!')            
-                        except:
-                            tag_values_inventory.append("")
-                            my_status.warning(message='No tags found for this resource.')
+                            # Get all the tags for a given EKS Cluster
+                            response = client.list_tags_for_resource(
+                                resourceArn=cluster_arn
+                            )
+                            if len(response.get('tags')):
+                                # Add all tag keys to the list
+                                for tag_key, tag_value in response['tags'].items():       
+                                    # Exclude any AWS-applied tags which begin with "aws:"
+                                    if not re.search("^aws:", tag_key):
+                                        tag_values_inventory.append(tag_value)
+                        except botocore.exceptions.ClientError as error:
+                            log.error("Boto3 API returned error: {}".format(error))
+                            if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                        
+                                my_status.error(message='You are not authorized to view these resources')
+                            else:
+                                my_status.error()
+                            return tag_values_inventory, my_status.get_status()
                     except botocore.exceptions.ClientError as error:
-                        log.error("Boto3 API returned error: {}".format(error))
-                        tag_values_inventory.append("")
-                        if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                        
-                            my_status.error(message='You are not authorized to view these resources')
-                        else:
-                            my_status.error()
+                            log.error("Boto3 API returned error: {}".format(error))
+                            if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                        
+                                my_status.error(message='You are not authorized to view these resources')
+                            else:
+                                my_status.error()
+                            return tag_values_inventory, my_status.get_status()
+                    
+            # Set success if tag values found else set warning
+            if len(tag_values_inventory):
+                my_status.success(message='Tag values found!')
+            else:
+                my_status.warning(message='No tag values found for this resource type.')	
+
         except botocore.exceptions.ClientError as error:
             log.error("Boto3 API returned error: {}".format(error))
-            tag_values_inventory.append("")
             if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                    
                 my_status.error(message='You are not authorized to view these resources')
             else:
                 my_status.error()
+            return tag_values_inventory, my_status.get_status()
 
         #Remove duplicate tags & sort
         tag_values_inventory = list(set(tag_values_inventory))
@@ -450,41 +484,46 @@ class eks_clusters_tags:
         my_status = execution_status()
         resources_updated_tags = dict()
         tag_dict = dict()
-
+        
+        self.resources_to_tag = resources_to_tag
+        self.chosen_tags = chosen_tags
         self.session_credentials = dict()
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.session_credentials = session_credentials
+        
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
 
         # for EKS Boto3 API covert list of tags dicts to single key:value tag dict 
-        for tag in chosen_tags:
+        for tag in self.chosen_tags:
             tag_dict[tag['Key']] = tag['Value']
        
-        for resource_arn in resources_to_tag:
+        for resource_arn in self.resources_to_tag:
+            #try:
+                #client = this_session.client(self.resource_type, region_name=self.region)
             try:
-                client = this_session.client(self.resource_type, region_name=self.region)
-                try:
-                    response = client.tag_resource(
-                        Resource=resource_arn,
-                        Tags=tag_dict
-                    )
-                    my_status.success(message='Tags updated successfully!')
-                except botocore.exceptions.ClientError as error:
-                    log.error("Boto3 API returned error: {}".format(error))
-                    resources_updated_tags["No Resources Found"] = "No Tags Applied"
-                    if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                        
-                        my_status.error(message='You are not authorized to modify these resources')
-                    else:
-                        my_status.error()
+                response = client.tag_resource(
+                    resourceArn=resource_arn,
+                    tags=tag_dict
+                )
+                my_status.success(message='EKS cluster tags updated successfully!')
             except botocore.exceptions.ClientError as error:
-                    log.error("Boto3 API returned error: {}".format(error))
-                    resources_updated_tags["No Resources Found"] = "No Tags Applied"
-                    if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                        
-                        my_status.error(message='You are not authorized to modify these resources')
-                    else:
-                        my_status.error()
+                log.error("Boto3 API returned error: {}".format(error))
+                resources_updated_tags["No Resources Found"] = "No Tags Applied"
+                if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                        
+                    my_status.error(message='You are not authorized to modify these resources')
+                else:
+                    my_status.error()
+            #except botocore.exceptions.ClientError as error:
+            #        log.error("Boto3 API returned error: {}".format(error))
+            #        resources_updated_tags["No Resources Found"] = "No Tags Applied"
+            #        if error.response['Error']['Code'] == 'AccessDeniedException' or error.response['Error']['Code'] == 'UnauthorizedOperation':                        
+            #            my_status.error(message='You are not authorized to modify these resources')
+            #        else:
+            #            my_status.error()
         return my_status.get_status()

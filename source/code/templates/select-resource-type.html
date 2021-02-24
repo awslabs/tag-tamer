@@ -23,8 +23,9 @@ SPDX-License-Identifier: MIT-0 -->
     <h3>Please select a resource type to tag</h3>
     <br />
     <div class="container">
-      <form method="post" action="{{ url_for(destination_route) }}">
+      <form method="post" action="{{ url_for('tag_filter') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="destination_route" value="{{ destination_route }}"/>
         <div class="form-check">
           <input
             class="form-check-input"
@@ -70,6 +71,16 @@ SPDX-License-Identifier: MIT-0 -->
           <input
             class="form-check-input"
             type="radio"
+            id="rdsRadio"
+            value="rds"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="rdsRadio">Amazon RDS Clusters</label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
             id="bucketRadio"
             value="s3"
             name="resource_type"
@@ -77,7 +88,7 @@ SPDX-License-Identifier: MIT-0 -->
           <label class="form-check-label" for="bucketRadio">Amazon S3 Buckets</label>
         </div>
         <button type="submit" class="btn btn-primary btn-lg">
-          Tag Resources
+          Select
         </button>
       </form>
     </div>

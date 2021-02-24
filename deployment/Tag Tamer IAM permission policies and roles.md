@@ -132,13 +132,110 @@ arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
     ]
 }
 ```
+### Example IAM role permissions policy allowing user to perform all Tag Tamer web app actions
 
-#### IAM role trust policy
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:PutItem",
+                "dynamodb:GetItem",
+                "dynamodb:Scan",
+                "dynamodb:UpdateItem"
+            ],
+            "Resource": [
+                "arn:aws:dynamodb:*:*:table/tag_tamer_roles",
+                "arn:aws:dynamodb:*:*:table/tag_tamer_tag_groups"
+            ]
+        },
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": [
+                "sts:AssumeRole",
+                "lambda:TagResource",
+                "ec2:DescribeInstances",
+                "servicecatalog:SearchProducts",
+                "iam:ListRoleTags",
+                "eks:ListTagsForResource",
+                "rds:DescribeGlobalClusters",
+                "servicecatalog:UntagResource",
+                "eks:DescribeNodegroup",
+                "ec2:DescribeVolumes",
+                "config:DescribeConfigRules",
+                "s3:PutObjectTagging",
+                "iam:ListRolePolicies",
+                "servicecatalog:UpdateTagOption",
+                "s3:DeleteObjectTagging",
+                "iam:ListPolicies",
+                "eks:ListNodegroups",
+                "lambda:ListFunctions",
+                "config:PutConfigRule",
+                "ec2:CreateTags",
+                "servicecatalog:ListTagsForResource",
+                "s3:GetObject",
+                "eks:DescribeCluster",
+                "eks:ListClusters",
+                "rds:RemoveTagsFromResource",
+                "config:UntagResource",
+                "rds:DescribeOptionGroups",
+                "servicecatalog:DeleteTagOption",
+                "s3:GetBucketTagging",
+                "ec2:DeleteTags",
+                "iam:TagRole",
+                "s3:ReplicateTags",
+                "s3:ListBucket",
+                "servicecatalog:ListTagOptions",
+                "s3:PutBucketTagging",
+                "servicecatalog:DescribeTagOption",
+                "lambda:ListTags",
+                "servicecatalog:DescribeProduct",
+                "rds:DescribeDBInstances",
+                "s3:GetObjectTagging",
+                "servicecatalog:AssociateTagOptionWithResource",
+                "rds:AddTagsToResource",
+                "servicecatalog:CreateTagOption",
+                "eks:UntagResource",
+                "ec2:DescribeTags",
+                "lambda:GetFunction",
+                "iam:ListRoles",
+                "servicecatalog:TagResource",
+                "iam:TagUser",
+                "config:ListTagsForResource",
+                "servicecatalog:SearchProductsAsAdmin",
+                "servicecatalog:DescribeProductAsAdmin",
+                "s3:ListAllMyBuckets",
+                "rds:ListTagsForResource",
+                "config:TagResource",
+                "eks:TagResource",
+                "rds:DescribeDBClusterEndpoints",
+                "rds:DescribeDBClusters"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+
+#### Example IAM role trust policy
 
 ```
 {
   "Version": "2012-10-17",
   "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:role/DEMOTagTamerAllAdminActionsRole"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {}
+    },
     {
       "Sid": "",
       "Effect": "Allow",
@@ -150,3 +247,4 @@ arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
   ]
 }
 ```
+

@@ -23,16 +23,16 @@ class get_tag_groups:
     #Class constructor
     def __init__(self, region, **session_credentials):
         self.my_status = execution_status()
-        self.tag_groups = {}
+        self.tag_groups = dict()
         self.region = region
-        self.session_credentials = {}
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
+        self.session_credentials = dict()
+        self.session_credentials['AccessKeyId'] = session_credentials.get('AccessKeyId')
+        self.session_credentials['SecretKey'] = session_credentials.get('SecretKey')
+        self.session_credentials['SessionToken'] = session_credentials.get('SessionToken')
         this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+            aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+            aws_secret_access_key=self.session_credentials.get('SecretKey'),
+            aws_session_token=self.session_credentials.get('SessionToken'))
         try:
             self.dynamodb = this_session.resource('dynamodb', region_name=self.region)
             self.table = self.dynamodb.Table('tag_tamer_tag_groups')
@@ -92,7 +92,7 @@ class get_tag_groups:
         
         return tag_group_key_values, self.my_status.get_status()
 
-    #Returns a list of 3-item groups where every 3-item group includes actual_tag_group_name, actual_tag_group_key
+    #Returns a list of 3-item lists where every 3-item list includes actual_tag_group_name, actual_tag_group_key
     #& a list[actual_tag_group_values]
     def get_all_tag_groups_key_values(self, region, **session_credentials):
         all_tag_groups_info = list()

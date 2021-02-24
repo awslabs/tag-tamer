@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: AWS Cloudformation template for TagTamer solution components - version - RC15
+Description: AWS Cloudformation template for TagTamer solution components - version - RC16
 
 Metadata: 
   AWS::CloudFormation::Interface: 
@@ -23,6 +23,10 @@ Metadata:
           default: "Cognito Identity Pool configuration"
         Parameters: 
           - TagTamerIdentityPoolName
+      - Label:
+          default: "List of multiple AWS account numbers to manage"
+        Parameters:
+           - TagTamerMultiAccounts
 
 Parameters:
   KeyName:
@@ -41,14 +45,12 @@ Parameters:
     Type: String
     MinLength: 9
     MaxLength: 18
-#    Default: 0.0.0.0/0
     AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
   Certificate:
     Description: >-
       Name of the certificate to use for ALB SSL connections.
       Example: arn:aws:acm-pca:region:account:certificate-authority/resource-identifier
     Type: String
-#    Default: arn:aws:acm:region:accountid:certificate/certificateid
   Email:
     Type: String
     Description: Source email address for sending emails to new users.  Must be an SES validated address.
@@ -60,6 +62,16 @@ Parameters:
     Type: String
     Default: tag_tamer_identity_pool
     Description: Name of Tag Tamer's Amazon Cognito Identity Pool
+  TagTamerMultiAccounts:
+    Type: String
+    Description: Comma separated list of AWS account numbers Tag Tamer should manage.  Do not include the AWS account number where the Tag Tamer EC2 instance is deployed.
+  
+Mappings:
+  SourceCode:
+    General:
+      S3Bucket: '%%BUCKET_NAME%%'
+      KeyPrefix: '%%SOLUTION_NAME%%/%%VERSION%%'
+      Version: '%%VERSION%%'
 
 Resources:
 
@@ -225,6 +237,8 @@ Resources:
       SecurityGroupEgress:
         - IpProtocol: tcp
           CidrIp: '0.0.0.0/0'
+          FromPort: 0
+          ToPort: 65535
       Tags:
       - Key: Name
         Value: Tagtamer-PublicLoadBalancerSecurityGroup
@@ -235,6 +249,8 @@ Resources:
             reason: "Works as designed"
           - id: W36
             reason: "This Security Group includes a description."
+          - id: W29
+            reason: "Works as designed"
 
   PublicLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -405,12 +421,16 @@ Resources:
       SecurityGroupEgress:
         - IpProtocol: tcp
           CidrIp: '0.0.0.0/0'
+          FromPort: 0
+          ToPort: 65535
     Metadata:
         cfn_nag:
           rules_to_suppress:
           - id: W2
             reason: "Tag Tamer customer may limit ingress CIDR to specific IP ranges for their users."
           - id: W28
+            reason: "Works as designed"
+          - id: W29
             reason: "Works as designed"
           - id: W5
             reason: "Works as designed"
@@ -457,10 +477,10 @@ Resources:
 #      InstanceId: !Ref EC2Instance
 #    DependsOn:
 #      - EC2Instance
-  TagTamerPolicy:
+  TagTamerWebAppEC2InstancePolicy:
     Type: 'AWS::IAM::Policy'
     Properties:
-      PolicyName: TagTamerPolicy
+      PolicyName: TagTamerWebAppEC2InstancePolicy
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -551,7 +571,7 @@ Resources:
         EmailSendingAccount: COGNITO_DEFAULT
       EmailVerificationMessage: 'Your Tag Tamer verification code is {####}. '
       EmailVerificationSubject: Your Tag Tamer verification code
-      MfaConfiguration: 'OPTIONAL'
+      MfaConfiguration: 'OFF'
       Policies:
         PasswordPolicy:
           MinimumLength: 8
@@ -574,6 +594,12 @@ Resources:
         EmailMessage: 'Your Tag Tamer verification code is {####}. '
         EmailSubject: Your Tag Tamer verification code
         DefaultEmailOption: CONFIRM_WITH_CODE
+    Metadata:
+        cfn_nag:
+          rules_to_suppress:
+          - id: F78
+            reason: "Works as designed.  If Tag Tamer admins choose to require MFA for access, they can enable it."
+
   TagTamerUserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
@@ -725,6 +751,13 @@ Resources:
       Name: /tag-tamer/cognito-identity-pool-id-value
       Type: String
       Value: !Ref TagTamerCognitoIdentityPool
+  
+  TagTamerMultiAccountsList:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /tag-tamer/multi-accounts
+      Type: String
+      Value: !Ref TagTamerMultiAccounts
 
   UserPoolClientRole:
   # Created to execute Lambda which gets userpool app client config values

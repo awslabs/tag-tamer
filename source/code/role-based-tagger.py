@@ -68,7 +68,7 @@ def lambda_handler(event, context):
                 )
                 applied_tags = list()
                 for tag in resource_tag_list:
-                    tag_kv = {}
+                    tag_kv = dict()
                     tag_kv["Key"] = tag.key
                     tag_kv["Value"] = tag.value
                     applied_tags.append(tag_kv)

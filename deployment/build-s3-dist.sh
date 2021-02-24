@@ -40,21 +40,28 @@ echo "rm -rf $build_dist_dir"
 rm -rf $build_dist_dir
 echo "mkdir -p $build_dist_dir"
 mkdir -p $build_dist_dir
-
+echo "pwd"
+pwd
+echo "ls -al"
+ls -al
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Templates"
 echo "------------------------------------------------------------------------------"
-echo "cp $template_dir/*.template $template_dist_dir/"
-cp $template_dir/*.template $template_dist_dir/
+#echo "cp $template_dir/*.template $template_dist_dir/"
+#cp $template_dir/*.template $template_dist_dir/
 echo "copy yaml templates and rename"
+echo "cp $template_dir/*.yaml $template_dist_dir/"
 cp $template_dir/*.yaml $template_dist_dir/
 cd $template_dist_dir
 # Rename all *.yaml to *.template
 for f in *.yaml; do 
     mv -- "$f" "${f%.yaml}.template"
 done
-
-cd ..
+echo "pwd"
+pwd
+echo "ls -al"
+ls -al
+#cd ..
 echo "Updating code source bucket in template with $1"
 replace="s/%%BUCKET_NAME%%/$1/g"
 echo "OLD - sed -i '' -e $replace $template_dist_dir/*.template"
@@ -66,4 +73,21 @@ sed -e $replace $template_dist_dir/*.template
 replace="s/%%VERSION%%/$3/g"
 echo "sed -e $replace $template_dist_dir/*.template"
 sed -e $replace $template_dist_dir/*.template
-
+echo "pwd"
+pwd
+echo "ls -al"
+ls -al
+echo "cd $build_dist_dir"
+cd $build_dist_dir
+echo "pwd"
+pwd
+echo "ls -al"
+ls -al
+echo "touch place-holder-file.txt"
+touch place-holder-file.txt
+echo "ls -al"
+ls -al
+echo "cd .."
+cd ..
+echo "pwd"
+pwd

@@ -25,7 +25,7 @@ class roles:
     def __init__(self, region, **session_credentials):
         self.my_status = execution_status()
         self.region = region
-        self.session_credentials = {}
+        self.session_credentials = dict()
         self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
         self.session_credentials['SecretKey'] = session_credentials['SecretKey']
         self.session_credentials['SessionToken'] = session_credentials['SessionToken']

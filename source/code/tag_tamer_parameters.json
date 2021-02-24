@@ -1,25 +1,26 @@
 {
-    "parameters": {
-        "default_region": "us-east-1",
-        "log_file_location": "./log/tag_tamer.log",
-        "logging_level": "INFO",
-        "selected_region": "us-east-1",
-        "ssm_parameter_path": "/tag-tamer/",
-        "ssm_parameter_names": [
-            "cognito-app-client-id",
-            "cognito-app-client-secret-value",
-            "cognito-default-region-value",
-            "cognito-domain-value",
-            "cognito-redirect-url-value",
-            "cognito-user-pool-id-value",
-            "cognito-identity-pool-id-value",
-            "jwt-access-cookie-name",
-            "jwt-cookie-csrf-protect",
-            "jwt-cookie-secure",
-            "jwt-token-location"
-        ],
-        "tag_key_regex": "^\\w[\\w\\- ]{0,125}\\w$",
-        "tag_value_regex": "^\\w[\\w\\- ]{0,223}\\w$",
-        "tagging_statistics": "YES"
-    }
+    "base_region": "us-east-1",
+    "additional_regions": [
+        "us-east-2"
+    ],
+    "log_file_location": "./log/tag_tamer.log",
+    "logging_level": "INFO",
+    "ssm_parameter_path": "/tag-tamer-bdry-dev1/",
+    "ssm_parameter_names": [
+        "cognito-app-client-id",
+        "cognito-app-client-secret-value",
+        "cognito-default-region-value",
+        "cognito-domain-value",
+        "cognito-redirect-url-value",
+        "cognito-user-pool-id-value",
+        "cognito-identity-pool-id-value",
+        "jwt-access-cookie-name",
+        "jwt-cookie-csrf-protect",
+        "jwt-cookie-secure",
+        "jwt-token-location",
+        "multi-accounts"
+    ],
+    "tag_key_regex": "^\\w[\\w\\- ]{0,125}\\w$",
+    "tag_value_regex": "^\\w[\\w\\- ]{0,223}\\w$",
+    "tagging_statistics": "Not currently used"
 }

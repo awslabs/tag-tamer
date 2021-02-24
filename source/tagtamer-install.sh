@@ -20,8 +20,7 @@ cp -pr code/* to /home/ec2-user/tag-tamer/
 
 mkdir -p /home/ec2-user/tag-tamer/log
 mkdir -p /var/log/tag-tamer
-#touch /var/log/tag-tamer/tag-tamer.err.log
-#touch /var/log/tag-tamer/tag-tamer.out.log
+mkdir -p /home/ec2-user/tag-tamer/downloads
 
 # Permissions
 chown root:root /etc/nginx/conf.d/tag-tamer.conf /etc/nginx/proxy_params /etc/nginx/default.d/ssl-redirect.conf /etc/systemd/system/tag-tamer.service

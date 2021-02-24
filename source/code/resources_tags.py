@@ -11,10 +11,14 @@ import boto3, botocore
 from botocore import exceptions
 # Import collections to use ordered dictionaries for storage
 from collections import OrderedDict
-# Import AWS EKS clusters resources & rags getters & setters
-from eks_clusters_tags import *
+# Impport csv to create output files
+import csv
+# Import AWS EKS clusters resources & tags getters & setters
+from eks_clusters_tags import eks_clusters_tags
 # Import AWS Lambda resources & tags getters & setters
-from lambda_resources_tags import * 
+from lambda_resources_tags import lambda_resources_tags
+# Import AWS RDS resources & tags getters & setters
+from rds_resources_tags import rds_resources_tags 
 # Import logging module
 import logging
 # Import Python's regex module to filter Boto3's API responses 
@@ -38,24 +42,28 @@ class resources_tags:
         self.unit = unit
         self.region = region
 
-    #Returns a sorted list of all resources for the resource type specified  
+    # Purpose:  Returns a sorted list of resource tuples for the resource type & filter tags submitted
+    #           Returns all resources for a give resource type if no filter tags submitted
+    #           resource tuples are (resource-id, resource-name) if the name tag exists
     def get_resources(self, filter_tags, **session_credentials):
         my_status = execution_status()
         self.filter_tags = dict()
         self.filter_tags = filter_tags
         log.debug("The received filter tags are: {}".format(self.filter_tags))
 
-        self.session_credentials = {}
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.session_credentials = dict()
+        self.session_credentials = session_credentials
         
-        client = this_session.client(self.resource_type, region_name=self.region)
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
 
+        # Nested function to get resources that match user-selected tag keys & values
         def _get_filtered_resources(client_command):
             
             filters_list = list()
@@ -63,9 +71,12 @@ class resources_tags:
             # Issue Boto3 method using client, client command & filters list
             def _boto3_get_method():
                 try:
-                    filtered_resources = getattr(client, client_command)(
-                        Filters=filters_list
-                    )
+                    if filters_list:
+                        filtered_resources = getattr(client, client_command)(
+                            Filters=filters_list
+                        )
+                    else:
+                        filtered_resources = getattr(client, client_command)()
                     my_status.success(message='Resources Found!')
                     log.debug("The filtered resources are: {}".format(filtered_resources))
                     return filtered_resources
@@ -82,6 +93,34 @@ class resources_tags:
                     filtered_resources = dict()
                     return filtered_resources
             
+            
+            ## Get all instance or volume resources that have no tags applied
+            if self.filter_tags.get('tag_key1') == '<No tags applied>' or \
+                self.filter_tags.get('tag_key2') == '<No tags applied>':
+                filters_list.clear()
+                requested_resources = _boto3_get_method()
+                if self.unit == 'instances':
+                    if requested_resources.get('Reservations'):
+                        for item in requested_resources['Reservations']:
+                            if item.get('Instances'):
+                                untagged_resources = list()
+                                for resource in item['Instances']:
+                                    # Untagged resources have no Tags attribute. Identify those & update list of instances 
+                                    if not resource.get('Tags'):
+                                        untagged_resources.append(resource)
+                                item['Instances'] = untagged_resources
+                if self.unit == 'volumes':
+                    if requested_resources.get('Volumes'):
+                        untagged_resources = list()
+                        for resource in requested_resources['Volumes']:
+                            # Untagged resources have no Tags attribute
+                            if not resource.get('Tags'):
+                                untagged_resources.append(resource)
+                        requested_resources['Volumes'] = untagged_resources
+                returned_dict = dict()
+                returned_dict['results_1'] = requested_resources
+                return returned_dict
+
             # Add any selected tag keys and values to the AWS resource filter "filters_list"
             if self.filter_tags.get('conjunction') == 'AND':
                 if self.filter_tags.get('tag_key1'):
@@ -159,6 +198,9 @@ class resources_tags:
             else:
                     return None
 
+        # Purpose:  Nested function to get all resources that have a tag with key 'name' or 'Name'
+        #           and values are selected.  This is used to quickly gather the "name tags" of resources
+        #           for easier identification in the Tag Tamer web UI 
         def _get_named_resources(client_command):
             try:
                 named_resources = getattr(client, client_command)(
@@ -193,28 +235,42 @@ class resources_tags:
             if self.filter_tags.get('tag_key1') or self.filter_tags.get('tag_key2'):
                 try:
                     filtered_resources = _get_filtered_resources('describe_instances')
-                    for _, results in filtered_resources.items():
-                        for item in results['Reservations']:
-                            for resource in item['Instances']:
-                                named_resource_inventory[resource['InstanceId']] = 'no name found'
-                                for tag in resource['Tags']:
-                                    if(tag['Key'].lower() == 'name'):
-                                        named_resource_inventory[resource['InstanceId']] = tag['Value']
-
+                    if len(filtered_resources):
+                        for _, results in filtered_resources.items():
+                            for item in results['Reservations']:
+                                for resource in item['Instances']:
+                                    named_resource_inventory[resource['InstanceId']] = 'no name found'
+                                    if resource.get('Tags'):
+                                        for tag in resource['Tags']:
+                                            if(tag['Key'].lower() == 'name'):
+                                                named_resource_inventory[resource['InstanceId']] = tag['Value']
+                        my_status.success(message='Resource tags found!')
+                    else:
+                        my_status.warning(message='No matching resources found')
+                        named_resource_inventory["No matching resources found"] = "No matching resources found"
                 except botocore.exceptions.ClientError as error:
                     log.error("Boto3 API returned error. function: {} - {}".format(sys._getframe().f_code.co_name, error))
+                    named_resource_inventory["No matching resources found"] = "No matching resources found"
             else:
                 try:
                     named_resources = _get_named_resources('describe_instances')
-                    selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
-                    for resource in selected_resource_type.instances.all():
-                        named_resource_inventory[resource.id] = 'no name found'
-                    for item in named_resources['Reservations']:
-                        for resource in item['Instances']:
-                            for tag in resource['Tags']:
-                                if(tag['Key'].lower() == 'name'):
-                                    named_resource_inventory[resource['InstanceId']] = tag['Value']
-                    my_status.success(message='Resources Found!')
+                    if len(named_resources):
+                        if session_credentials.get('multi_account_role_session'):
+                            selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+                        else:
+                            selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                        # Get all the resource ID's then add actual names to those having existing "name tags"
+                        for resource in selected_resource_type.instances.all():
+                            named_resource_inventory[resource.id] = 'no name found'
+                        for item in named_resources['Reservations']:
+                            for resource in item['Instances']:
+                                for tag in resource['Tags']:
+                                    if(tag['Key'].lower() == 'name'):
+                                        named_resource_inventory[resource['InstanceId']] = tag['Value']
+                        my_status.success(message='Resource tags found!')
+                    else:
+                        my_status.warning(message='No matching resources found')
+                        named_resource_inventory["No matching resources found"] = "No matching resources found"
                 except botocore.exceptions.ClientError as error:
                     log.error("Boto3 API returned error. function: {} - {}".format(sys._getframe().f_code.co_name, error))
                     if error.response['Error']['Code'] == 'AccessDeniedException' or \
@@ -223,44 +279,67 @@ class resources_tags:
                         my_status.error(message='You are not authorized to view these resources')
                     else:
                         my_status.error()
+            
+            named_resource_status = my_status.get_status()
+
 
         elif self.unit == 'volumes':
             if self.filter_tags.get('tag_key1') or self.filter_tags.get('tag_key2'):
                 try:
                     filtered_resources = _get_filtered_resources('describe_volumes')
-                    for _, results in filtered_resources.items():
-                        for item in results['Volumes']:
-                            named_resource_inventory[item['VolumeId']] = 'no name found'
-                            for tag in item['Tags']:
-                                if(tag['Key'].lower() == 'name'):
-                                    named_resource_inventory[item['VolumeId']] = tag['Value']
-
+                    if len(filtered_resources):
+                        for _, results in filtered_resources.items():
+                            for item in results['Volumes']:
+                                named_resource_inventory[item['VolumeId']] = 'no name found'
+                                if item.get('Tags'):
+                                    for tag in item['Tags']:
+                                        if(tag['Key'].lower() == 'name'):
+                                                named_resource_inventory[item['VolumeId']] = tag['Value']
+                        my_status.success(message='Resource tags found!')
+                    else:
+                        my_status.warning(message='No matching resources found')
+                        named_resource_inventory["No matching resources found"] = "No matching resources found"
                 except botocore.exceptions.ClientError as error:
                     log.error("Boto3 API returned error. function: {} - {}".format(sys._getframe().f_code.co_name, error))
+                    named_resource_inventory["No matching resources found"] = "No matching resources found"
             else:
                 try:
                     named_resources = _get_named_resources('describe_volumes')
-                    selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
-                    for resource in selected_resource_type.volumes.all():
-                        named_resource_inventory[resource.id] = 'no name found'
-                    for item in named_resources['Volumes']:
-                            for tag in item['Tags']:
-                                if(tag['Key'].lower() == 'name'):
-                                    named_resource_inventory[item['VolumeId']] = tag['Value']
-                    my_status.success(message='Resources Found!')
+                    if len(named_resources):
+                        if session_credentials.get('multi_account_role_session'):
+                            selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+                        else:
+                            selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                        # Get all the resource ID's then add actual names to those having existing "name tags"
+                        for resource in selected_resource_type.volumes.all():
+                            named_resource_inventory[resource.id] = 'no name found'
+                        for item in named_resources['Volumes']:
+                                for tag in item['Tags']:
+                                    if(tag['Key'].lower() == 'name'):
+                                        named_resource_inventory[item['VolumeId']] = tag['Value']
+                        my_status.success(message='Resources Found!')
+                    else:
+                        my_status.warning(message='No matching resources found')
+                        named_resource_inventory["No matching resources found"] = "No matching resources found"
                 except botocore.exceptions.ClientError as error:
                     errorString = "Boto3 API returned error. function: {} - {}"
                     log.error(errorString.format(sys._getframe().f_code.co_name, error))
-                    named_resource_inventory["No Resource Found"] = "No Resource Found"
+                    named_resource_inventory["No matching resources found"] = "No matching resources found"
                     if error.response['Error']['Code'] == 'AccessDeniedException' or \
                         error.response['Error']['Code'] == 'UnauthorizedOperation' or \
                         error.response['Error']['Code'] == 'AccessDenied':
                         my_status.error(message='You are not authorized to view these resources')
                     else:
                         my_status.error()
+            
+            named_resource_status = my_status.get_status()
+
 
         elif self.unit == 'buckets':
-            selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+            if session_credentials.get('multi_account_role_session'):
+                selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+            else:
+                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
             if self.filter_tags.get('tag_key1') or self.filter_tags.get('tag_key2'):
                 for resource in selected_resource_type.buckets.all(): 
                     log.debug("This bucket name is: {}".format(resource))
@@ -271,7 +350,7 @@ class resources_tags:
                         my_status.success(message='Resources Found!')
                     except botocore.exceptions.ClientError as error:
                         errorString = "Boto3 API returned error. function: {} - {}"
-                        log.error(errorString.format(resource.name, error))
+                        log.error(errorString.format(sys._getframe().f_code.co_name, error))
                         if error.response['Error']['Code'] == 'AccessDeniedException' or \
                             error.response['Error']['Code'] == 'UnauthorizedOperation' or \
                             error.response['Error']['Code'] == 'AccessDenied':
@@ -295,6 +374,10 @@ class resources_tags:
                                 else:
                                     if tag.get('Key') == self.filter_tags.get('tag_key2'):
                                         named_resource_inventory[resource.name] = resource.name
+                    ## Get all buckets that have no tags applied
+                    elif self.filter_tags.get('tag_key1') == '<No tags applied>' or \
+                        self.filter_tags.get('tag_key2') == '<No tags applied>':
+                        named_resource_inventory[resource.name] = resource.name
             else:
                 try:
                     for resource in selected_resource_type.buckets.all():   
@@ -302,9 +385,9 @@ class resources_tags:
                     my_status.success(message='Resources Found!')
                     log.debug("The buckets list is: {}".format(named_resource_inventory))
                 except botocore.exceptions.ClientError as error:
-                    errorString = "Boto3 API returned error. function: {} - {}"
-                    log.error(errorString.format(self.unit, error))
-                    named_resource_inventory["No Resource Found"] = "No Resource Found"
+                    errorString = "Boto3 API returned error. function: {} - {} - {}"
+                    log.error(errorString.format(sys._getframe().f_code.co_name, self.unit, error))
+                    named_resource_inventory["No matching resources found"] = "No matching resources found"
                     if error.response['Error']['Code'] == 'AccessDeniedException' or \
                         error.response['Error']['Code'] == 'UnauthorizedOperation' or \
                         error.response['Error']['Code'] == 'AccessDenied':
@@ -312,60 +395,130 @@ class resources_tags:
                     else:
                         my_status.error()
 
+            named_resource_status = my_status.get_status()
+
         elif self.unit == "functions":
             functions_inventory = lambda_resources_tags(self.resource_type, self.region)
-            named_resource_inventory, lambda_resources_status = functions_inventory.get_lambda_names_ids(self.filter_tags, **self.session_credentials)
-            return named_resource_inventory, lambda_resources_status
+            named_resource_inventory, named_resource_status = functions_inventory.get_lambda_names_ids(self.filter_tags, **self.session_credentials)
 
         elif self.unit == "clusters":
             clusters_inventory = eks_clusters_tags(self.resource_type, self.region)
-            named_resource_inventory, eks_clusters_status = clusters_inventory.get_eks_clusters_ids(self.filter_tags, **self.session_credentials)
-            return named_resource_inventory, eks_clusters_status
+            named_resource_inventory, named_resource_status = clusters_inventory.get_eks_clusters_ids(self.filter_tags, **self.session_credentials)
+        
+        elif self.unit == "rdsclusters":
+            rds_clusters_inventory = rds_resources_tags(self.resource_type, self.region)
+            named_resource_inventory, named_resource_status = rds_clusters_inventory.get_rds_names_ids(self.filter_tags, **self.session_credentials)
+        
+        # Handle case where there are no resources meeting filter requirements
+        if not len(named_resource_inventory):
+            named_resource_inventory["No matching resources found"] = "No matching resources found"
 
         # Sort the resources based on the resource's name
         ordered_inventory = OrderedDict()
         ordered_inventory = sorted(named_resource_inventory.items(), key=lambda item: item[1])
-        return ordered_inventory, my_status.get_status()
-            
-    # Returns a nested dictionary of every resource & its key:value tags for the chosen resource type
-    # No input arguments
+        #return ordered_inventory, my_status.get_status()
+        return ordered_inventory, named_resource_status
+    
+    # method - download_csv
+    # Creates a csv file of returned resource tag results for downloading
+    def download_csv(self, file_open_method, account_number, region, inventory, user_name):
+        download_file = "./downloads/" + user_name + "-download.csv"
+        file_contents = list()
+        max_tags = 0
+        for resource_id, tags in inventory.items():
+            row = list()
+            if len(tags) > max_tags:
+                max_tags = len(tags)
+            row.append(account_number)
+            row.append(region)
+            row.append(resource_id)
+            for key, value in tags.items():
+                row.append(key)
+                row.append(value)
+            file_contents.append(row)
+        if file_open_method == "w":
+            header_row = list()
+            header_row.append("AWS Account Number")
+            header_row.append("AWS Region")
+            header_row.append("Resource ID")
+            iterator = 1
+            while iterator <= max_tags:
+                tag_key_header = "Tag Key" + str(iterator)
+                header_row.append(tag_key_header)
+                tag_value_header = "Tag Value" + str(iterator)
+                header_row.append(tag_value_header)
+                iterator += 1
+        with open(download_file, file_open_method, newline="") as file:
+            writer = csv.writer(file)
+            if file_open_method == "w":
+                writer.writerow(header_row)
+            writer.writerows(file_contents)
+        file.close()
+        #return download_file
+
+    # Purpose:  Returns a nested dictionary of every resource & its key:value tags for the chosen resource type
+    # Input arguments are Boto3 session credentials including list of chosen resource tuples & user name making request
     def get_resources_tags(self, **session_credentials):
         log.debug('The received session credentials are: %s', session_credentials)
         my_status = execution_status()
+        returned_status = dict()
         # Instantiate dictionaries to hold resources & their tags
-        tagged_resource_inventory = {}
-        sorted_tagged_resource_inventory = {}
+        tagged_resource_inventory = dict()
+        sorted_tagged_resource_inventory = dict()
 
-        self.session_credentials = {}
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.chosen_resources = session_credentials.get('chosen_resources')
+        self.region = session_credentials.get('region')
+
+        self.session_credentials = dict()
+        self.session_credentials = session_credentials
         
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
+
         # Interate through resources & inject resource ID's with user-defined tag key:value pairs per resource into a nested dictionary
         # indexed by resource ID
         if self.unit == 'instances':
             try:
-                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
-                for item in selected_resource_type.instances.all():
-                    resource_tags = {}
-                    sorted_resource_tags = {}
-                    try:
-                        for tag in item.tags:
-                            if not re.search("^aws:", tag["Key"]):
-                                resource_tags[tag["Key"]] = tag["Value"]
-                    except:
-                        resource_tags["No Tags Found"] = "No Tags Found"
-                    sorted_resource_tags = OrderedDict(sorted(resource_tags.items()))
-                    tagged_resource_inventory[item.id] = sorted_resource_tags
-                my_status.success(message='Resources and tags found!')
+                if self.chosen_resources:
+                    #client = this_session.client(self.resource_type, region_name=self.region)
+                    for resource_id_name in self.chosen_resources:
+                        response = client.describe_tags(
+                            Filters=[
+                                {
+                                'Name': 'resource-id',
+                                'Values': [
+                                    resource_id_name[0]
+                                ]
+                                }
+                            ]
+                        )
+                        resource_tags = dict()
+                        sorted_resource_tags = dict()
+                        if response.get('Tags'):
+                            user_applied_tags = False
+                            for tag in response['Tags']:
+                                if not re.search("^aws:", tag["Key"]):
+                                    resource_tags[tag["Key"]] = tag["Value"]
+                                    user_applied_tags = True
+                            if not user_applied_tags:
+                                resource_tags['No user-applied tag keys found'] = 'No user-applied tag values found'
+                        else:
+                            resource_tags["No user-applied tag keys found"] = "No user-applied tag values found"
+                        sorted_resource_tags = OrderedDict(sorted(resource_tags.items()))
+                        tagged_resource_inventory[resource_id_name[0]] = sorted_resource_tags
+                    my_status.success(message='Resources and tags found!')
+                else:
+                    my_status.error(message='An error occurred.  Please contact your Tag Tamer administrator for assistance.')
             except botocore.exceptions.ClientError as error:
-                errorString = "Boto3 API returned error. function: {} - {}"
-                log.error(errorString.format(self.unit, error))
-                tagged_resource_inventory["No Resource Found"] = {"No Tags Found": "No Tags Found"}
+                errorString = "Boto3 API returned error. function: {} - {} - {}"
+                log.error(errorString.format(sys._getframe().f_code.co_name, self.unit, error))
+                tagged_resource_inventory["No matching resources found"] = {"No Tags Found": "No Tags Found"}
                 if error.response['Error']['Code'] == 'AccessDeniedException' or \
                     error.response['Error']['Code'] == 'UnauthorizedOperation' or \
                     error.response['Error']['Code'] == 'AccessDenied':
@@ -374,23 +527,42 @@ class resources_tags:
                     my_status.error()
         elif self.unit == 'volumes':
             try:
-                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
-                for item in selected_resource_type.volumes.all():
-                    resource_tags = {}
-                    sorted_resource_tags = {}
-                    try:
-                        for tag in item.tags:
-                            if not re.search("^aws:", tag["Key"]):
-                                resource_tags[tag["Key"]] = tag["Value"]
-                    except:
-                        resource_tags["No Tags Found"] = "No Tags Found"
-                    sorted_resource_tags = OrderedDict(sorted(resource_tags.items()))
-                    tagged_resource_inventory[item.id] = sorted_resource_tags
-                my_status.success(message='Resources and tags found!')
+                if self.chosen_resources:
+                    #client = this_session.client(self.resource_type, region_name=self.region)
+                    for resource_id_name in self.chosen_resources:
+                        response = client.describe_tags(
+                            Filters=[
+                                {
+                                'Name': 'resource-id',
+                                'Values': [
+                                    resource_id_name[0]
+                                ]
+                                }
+                            ]
+                        )
+                        resource_tags = dict()
+                        sorted_resource_tags = dict()
+                        if response.get('Tags'):
+                            user_applied_tags = False
+                            for tag in response['Tags']:
+                                if not re.search("^aws:", tag["Key"]):
+                                   resource_tags[tag["Key"]] = tag["Value"]
+                                   user_applied_tags = True
+                            if not user_applied_tags:
+                                resource_tags['No user-applied tag keys found'] = 'No user-applied tag values found'
+                        else:
+                            resource_tags["No user-applied tag keys found"] = "No user-applied tag values found"
+                        
+                        sorted_resource_tags = OrderedDict(sorted(resource_tags.items()))
+                        tagged_resource_inventory[resource_id_name[0]] = sorted_resource_tags
+                    my_status.success(message='Resources and tags found!')
+                else:
+                    my_status.error(message='An error occurred.  Please contact your Tag Tamer administrator for assistance.')
+
             except botocore.exceptions.ClientError as error:
-                errorString = "Boto3 API returned error. function: {} - {}"
-                log.error(errorString.format(self.unit, error))
-                tagged_resource_inventory["No Resource Found"] = {"No Tags Found": "No Tags Found"}
+                errorString = "Boto3 API returned error. function: {} - {} - {}"
+                log.error(errorString.format(sys._getframe().f_code.co_name, self.unit, error))
+                tagged_resource_inventory["No matching resources found"] = {"No Tag Keys Found": "No Tag Values Found"}
                 if error.response['Error']['Code'] == 'AccessDeniedException' or \
                     error.response['Error']['Code'] == 'UnauthorizedOperation' or \
                     error.response['Error']['Code'] == 'AccessDenied':
@@ -399,74 +571,116 @@ class resources_tags:
                     my_status.error()
         elif self.unit == 'buckets':
             try:
-                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
-                for item in selected_resource_type.buckets.all():
-                    resource_tags = {}
-                    sorted_resource_tags = {}
-                    try:
-                        for tag in selected_resource_type.BucketTagging(item.name).tag_set:
-                            if not re.search("^aws:", tag["Key"]):
-                                resource_tags[tag["Key"]] = tag["Value"]
-                    except:
-                        resource_tags["No Tags Found"] = "No Tags Found"
-                    sorted_resource_tags = OrderedDict(sorted(resource_tags.items()))
-                    tagged_resource_inventory[item.name] = sorted_resource_tags
-                my_status.success(message='Resources and tags found!')
+                if self.chosen_resources:
+                    #client = this_session.client(self.resource_type, region_name=self.region)
+                    for resource_id_name in self.chosen_resources:
+                        try:
+                            response = client.get_bucket_tagging(
+                                Bucket=resource_id_name[0]
+                            )
+                        except botocore.exceptions.ClientError as error:
+                            errorString = "Boto3 API returned error. function: {} - bucket: {} - error message: {}"
+                            if error.response['Error']['Code'] == 'NoSuchTagSet':
+                                log.info(errorString.format(sys._getframe().f_code.co_name, resource_id_name[0], error))
+                                my_status.warning(message='No bucket tags found')
+                            elif error.response['Error']['Code'] == 'AccessDeniedException' or \
+                                error.response['Error']['Code'] == 'UnauthorizedOperation' or \
+                                error.response['Error']['Code'] == 'AccessDenied':
+                                log.error(errorString.format(sys._getframe().f_code.co_name, resource_id_name[0], error))
+                                my_status.error(message='You are not authorized to view these resources')
+                            else:
+                                log.error(errorString.format(sys._getframe().f_code.co_name, resource_id_name[0], error))
+                                my_status.error()
+                            response = dict()
+                        resource_tags = dict()
+                        sorted_resource_tags = dict()
+                        if response.get('TagSet'):
+                            user_applied_tags = False
+                            for tag in response['TagSet']:
+                                if not re.search("^aws:", tag["Key"]):
+                                   resource_tags[tag["Key"]] = tag["Value"]
+                                   user_applied_tags = True
+                            if not user_applied_tags:
+                                resource_tags['No user-applied tag keys found'] = 'No user-applied tag values found'
+                        else:
+                            resource_tags["No user-applied tag keys found"] = "No user-applied tag values found"
+
+                        sorted_resource_tags = OrderedDict(sorted(resource_tags.items()))
+                        tagged_resource_inventory[resource_id_name[0]] = sorted_resource_tags
+                    my_status.success(message='Resources and tags found!')
+                else:
+                    my_status.error(message='An error occurred.  Please contact your Tag Tamer administrator for assistance.')
+
             except botocore.exceptions.ClientError as error:
-                errorString = "Boto3 API returned error. function: {} - {}"
-                log.error(errorString.format(self.unit, error))
-                tagged_resource_inventory["No Resource Found"] = {"No Tags Found": "No Tags Found"}
+                errorString = "Boto3 API returned error. function: {} - {} - {}"
+                log.error(errorString.format(sys._getframe().f_code.co_name, self.unit, error))
+                tagged_resource_inventory["No matching resources found"] = {"No Tag Keys Found": "No Tag Values Found"}
                 if error.response['Error']['Code'] == 'AccessDeniedException' or \
                     error.response['Error']['Code'] == 'UnauthorizedOperation' or \
                     error.response['Error']['Code'] == 'AccessDenied':
                     my_status.error(message='You are not authorized to view these resources')
                 else:
                     my_status.error()
+
         elif self.unit == 'functions':
             functions_inventory = lambda_resources_tags(self.resource_type, self.region)
-            tagged_resource_inventory, lambda_resources_status = functions_inventory.get_lambda_resources_tags(**self.session_credentials)
-            return tagged_resource_inventory, lambda_resources_status
+            tagged_resource_inventory, returned_status = functions_inventory.get_lambda_resources_tags(**self.session_credentials)
         
         elif self.unit == 'clusters':
             clusters_inventory = eks_clusters_tags(self.resource_type, self.region)
-            tagged_resource_inventory, eks_clusters_status = clusters_inventory.get_eks_clusters_tags(**self.session_credentials)
-            return tagged_resource_inventory, eks_clusters_status
+            tagged_resource_inventory, returned_status = clusters_inventory.get_eks_clusters_tags(**self.session_credentials)
+
+        elif self.unit == 'rdsclusters':
+            rds_clusters_inventory = rds_resources_tags(self.resource_type, self.region)
+            tagged_resource_inventory, returned_status = rds_clusters_inventory.get_rds_resources_tags(**self.session_credentials)
 
         sorted_tagged_resource_inventory = OrderedDict(sorted(tagged_resource_inventory.items()))
+        
+        if not returned_status:
+            returned_status = my_status.get_status()
+        
+        return sorted_tagged_resource_inventory, returned_status
 
-        return sorted_tagged_resource_inventory, my_status.get_status()
-
-    # Getter method retrieves every tag:key for object's resource type
-    # No input arguments
+    # Purpose:  Getter method retrieves every tag:key for object's resource type
+    # Input arguments are Boto3 session credentials
     def get_tag_keys(self, **session_credentials):
         my_status = execution_status()
         sorted_tag_keys_inventory = list()
+        # Give users ability to find resources with no tags applied
+        sorted_tag_keys_inventory.append('<No tags applied>')
 
-        self.session_credentials = {}
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.session_credentials = dict()
+        self.session_credentials = session_credentials
+
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
 
         if self.unit == 'instances':
             try:
-                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                if session_credentials.get('multi_account_role_session'):
+                    selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+                else:
+                    selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                item_count = False
                 for item in selected_resource_type.instances.all():
-                    try:
+                    if item.tags:
                         for tag in item.tags:
                             if not re.search("^aws:", tag["Key"]):
                                 sorted_tag_keys_inventory.append(tag["Key"])
-                        my_status.success(message='Resources and tags found!')
-                    except:
-                        #sorted_tag_keys_inventory.append("No tag keys found")
-                        sorted_tag_keys_inventory.append("")
+                                item_count = True
+                                my_status.success(message='Tag keys found!')
+                if not item_count:
+                    sorted_tag_keys_inventory.append("No tags keys found!")
+                    my_status.warning(message='No tag keys found!')
             except botocore.exceptions.ClientError as error:
-                errorString = "Boto3 API returned error. function: {} - {}"
-                log.error(errorString.format(self.unit, error))
-                #sorted_tag_keys_inventory.append("No tag keys found")
+                errorString = "Boto3 API returned error. function: {} - {} - {}"
+                log.error(errorString.format(sys._getframe().f_code.co_name, self.unit, error))
                 sorted_tag_keys_inventory.append("")
                 if error.response['Error']['Code'] == 'AccessDeniedException' or \
                     error.response['Error']['Code'] == 'UnauthorizedOperation' or \
@@ -476,18 +690,26 @@ class resources_tags:
                     my_status.error()
         elif self.unit == 'volumes':
             try:
-                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                if session_credentials.get('multi_account_role_session'):
+                    selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+                else:
+                    selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                
+                item_count = False
                 for item in selected_resource_type.volumes.all():
-                    try:
+                    if item.tags:
                         for tag in item.tags:
                             if not re.search("^aws:", tag["Key"]):
                                 sorted_tag_keys_inventory.append(tag["Key"])
-                        my_status.success(message='Resources and tags found!')
-                    except:
-                        sorted_tag_keys_inventory.append("No Tags Found")
+                                item_count = True
+                                my_status.success(message='Tag keys found!')
+                if not item_count:
+                    sorted_tag_keys_inventory.append("No tags keys found!")
+                    my_status.warning(message='No tag keys found!')
+                
             except botocore.exceptions.ClientError as error:
-                errorString = "Boto3 API returned error. function: {} - {}"
-                log.error(errorString.format(self.unit, error))
+                errorString = "Boto3 API returned error. function: {} - {} - {}"
+                log.error(errorString.format(sys._getframe().f_code.co_name, self.unit, error))
                 sorted_tag_keys_inventory.append("No Tags Found")
                 if error.response['Error']['Code'] == 'AccessDeniedException' or \
                     error.response['Error']['Code'] == 'UnauthorizedOperation' or \
@@ -496,26 +718,39 @@ class resources_tags:
                 else:
                     my_status.error()
         elif self.unit == 'buckets':
-            try:
+            if session_credentials.get('multi_account_role_session'):
+                selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+            else:
                 selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
-                for item in selected_resource_type.buckets.all():
-                    try:
+            #boto_api_error = False
+            item_count = False
+            for item in list(selected_resource_type.buckets.all()):
+                try:
+                    if selected_resource_type.BucketTagging(item.name).tag_set:
                         for tag in selected_resource_type.BucketTagging(item.name).tag_set:
                             if not re.search("^aws:", tag["Key"]):
                                 sorted_tag_keys_inventory.append(tag["Key"])
-                    except:
-                        sorted_tag_keys_inventory.append("No Tags Found")
-                my_status.success(message='Resources and tags found!')
-            except botocore.exceptions.ClientError as error:
-                errorString = "Boto3 API returned error. function: {} - {}"
-                log.error(errorString.format(self.unit, error))
-                sorted_tag_keys_inventory.append("No Tags Found")
-                if error.response['Error']['Code'] == 'AccessDeniedException' or \
-                    error.response['Error']['Code'] == 'UnauthorizedOperation' or \
-                    error.response['Error']['Code'] == 'AccessDenied':
-                    my_status.error(message='You are not authorized to view these resources')
-                else:
-                    my_status.error()
+                                item_count = True
+                except botocore.exceptions.ClientError as error:
+                    if error.response['Error']['Code'] == 'NoSuchTagSet':
+                        errorString = "Boto3 API returned error. function: {} - bucket: {} - error message: {}"
+                        log.info(errorString.format(sys._getframe().f_code.co_name, item.name, error))
+                    elif error.response['Error']['Code'] == 'AccessDeniedException' or \
+                        error.response['Error']['Code'] == 'UnauthorizedOperation' or \
+                        error.response['Error']['Code'] == 'AccessDenied':
+                        #boto_api_error = 'You are not authorized to view these resources'
+                        errorString = "Boto3 API returned error. function: {} - bucket: {} - error message: {}"
+                        log.error(errorString.format(sys._getframe().f_code.co_name, item.name, error))
+                    else:
+                        #boto_api_error = "A Boto3 API error occurred.  Please contact your Tag Tamer administrator for assistance."
+                        errorString = "Boto3 API returned error. function: {} - error message: {}"
+                        log.error(errorString.format(sys._getframe().f_code.co_name, error))
+
+            if item_count:
+                my_status.success(message='Tag keys found!')
+            else:
+                my_status.warning(message='No tag keys found!')
+
         elif self.unit == 'functions':
             functions_inventory = lambda_resources_tags(self.resource_type, self.region)
             sorted_tag_keys_inventory, lambda_resources_status = functions_inventory.get_lambda_tag_keys(**self.session_credentials)
@@ -525,6 +760,11 @@ class resources_tags:
             clusters_inventory = eks_clusters_tags(self.resource_type, self.region)
             sorted_tag_keys_inventory, eks_clusters_status = clusters_inventory.get_eks_clusters_keys(**self.session_credentials) 
             return sorted_tag_keys_inventory, eks_clusters_status
+        
+        elif self.unit == 'rdsclusters':
+            rds_clusters_inventory = rds_resources_tags(self.resource_type, self.region)
+            sorted_tag_keys_inventory, rds_resources_status = rds_clusters_inventory.get_rds_tag_keys(**self.session_credentials)
+            return sorted_tag_keys_inventory, rds_resources_status
 
         #Remove duplicate tags & sort
         sorted_tag_keys_inventory = list(set(sorted_tag_keys_inventory))
@@ -532,35 +772,44 @@ class resources_tags:
 
         return sorted_tag_keys_inventory, my_status.get_status()
 
-    # Getter method retrieves every tag:value for object's resource type
-    # No input arguments
+    # Purpose:  Getter method retrieves every tag:value for object's resource type
+    # Input arguments are Boto3 session credentials
     def get_tag_values(self, **session_credentials):
         my_status = execution_status()
         sorted_tag_values_inventory = list()
 
-        self.session_credentials = {}
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.session_credentials = dict()
+        self.session_credentials = session_credentials
+        
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
 
         if self.unit == 'instances':
             try:
-                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                if session_credentials.get('multi_account_role_session'):
+                    selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+                else:
+                    selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                item_count = False
                 for item in selected_resource_type.instances.all():
-                    try:
+                    if item.tags:
                         for tag in item.tags:
                             if not re.search("^aws:", tag["Key"]) and tag["Value"]:
                                 sorted_tag_values_inventory.append(tag["Value"])
-                    except:
-                        sorted_tag_values_inventory.append("No Tags Found")
-                my_status.success(message='Resources and tags found!')
+                                item_count = True
+                                my_status.success(message='Tag values found!')
+                if not item_count:
+                    sorted_tag_values_inventory.append("No tags values found!")
+                    my_status.warning(message='No tag values found!')
             except botocore.exceptions.ClientError as error:
-                errorString = "Boto3 API returned error. function: {} - {}"
-                log.error(errorString.format(self.unit, error))
+                errorString = "Boto3 API returned error. function: {} - {} - {}"
+                log.error(errorString.format(sys._getframe().f_code.co_name, self.unit, error))
                 sorted_tag_values_inventory.append("No Tags Found")
                 if error.response['Error']['Code'] == 'AccessDeniedException' or \
                     error.response['Error']['Code'] == 'UnauthorizedOperation' or \
@@ -570,18 +819,24 @@ class resources_tags:
                     my_status.error()
         elif self.unit == 'volumes':
             try:
-                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                if session_credentials.get('multi_account_role_session'):
+                    selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+                else:
+                    selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                item_count = False
                 for item in selected_resource_type.volumes.all():
-                    try:
+                    if item.tags:
                         for tag in item.tags:
                             if not re.search("^aws:", tag["Key"])  and tag["Value"]:
                                 sorted_tag_values_inventory.append(tag["Value"])
-                    except:
-                        sorted_tag_values_inventory.append("No Tags Found")
-                my_status.success(message='Resources and tags found!')
+                                item_count = True
+                                my_status.success(message='Tag values found!')
+                if not item_count:
+                    sorted_tag_values_inventory.append("No tags values found!")
+                    my_status.warning(message='No tag values found!')
             except botocore.exceptions.ClientError as error:
-                errorString = "Boto3 API returned error. function: {} - {}"
-                log.error(errorString.format(self.unit, error))
+                errorString = "Boto3 API returned error. function: {} - {} - {}"
+                log.error(errorString.format(sys._getframe().f_code.co_name, self.unit, error))
                 sorted_tag_values_inventory.append("No Tags Found")
                 if error.response['Error']['Code'] == 'AccessDeniedException' or \
                     error.response['Error']['Code'] == 'UnauthorizedOperation' or \
@@ -590,26 +845,36 @@ class resources_tags:
                 else:
                     my_status.error()
         elif self.unit == 'buckets':
-            try:
+            if session_credentials.get('multi_account_role_session'):
+                selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+            else:
                 selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
-                for item in selected_resource_type.buckets.all():
-                    try:
+            item_count = False
+            for item in list(selected_resource_type.buckets.all()):
+                try:
+                    if selected_resource_type.BucketTagging(item.name).tag_set:
                         for tag in selected_resource_type.BucketTagging(item.name).tag_set:
                             if not re.search("^aws:", tag["Key"])  and tag["Value"]:
                                 sorted_tag_values_inventory.append(tag["Value"])
-                    except:
-                        sorted_tag_values_inventory.append("No Tags Found")
-                my_status.success(message='Resources and tags found!')
-            except botocore.exceptions.ClientError as error:
-                errorString = "Boto3 API returned error. function: {} - {}"
-                log.error(errorString.format(self.unit, error))
-                sorted_tag_values_inventory.append("No Tags Found")
-                if error.response['Error']['Code'] == 'AccessDeniedException' or \
-                    error.response['Error']['Code'] == 'UnauthorizedOperation' or \
-                    error.response['Error']['Code'] == 'AccessDenied':
-                    my_status.error(message='You are not authorized to view these resources')
-                else:
-                    my_status.error()
+                                item_count = True
+                except botocore.exceptions.ClientError as error:
+                    if error.response['Error']['Code'] == 'NoSuchTagSet':
+                        errorString = "Boto3 API returned error. function: {} - bucket: {} - error message: {}"
+                        log.info(errorString.format(sys._getframe().f_code.co_name, item.name, error))
+                    elif error.response['Error']['Code'] == 'AccessDeniedException' or \
+                        error.response['Error']['Code'] == 'UnauthorizedOperation' or \
+                        error.response['Error']['Code'] == 'AccessDenied':
+                        errorString = "Boto3 API returned error. function: {} - bucket: {} - error message: {}"
+                        log.error(errorString.format(sys._getframe().f_code.co_name, item.name, error))
+                    else:
+                        errorString = "Boto3 API returned error. function: {} - error message: {}"
+                        log.error(errorString.format(sys._getframe().f_code.co_name, error))
+
+            if item_count:
+                my_status.success(message='Tag values found!')
+            else:
+                my_status.warning(message='No tag values found!')
+
         elif self.unit == 'functions':
             functions_inventory = lambda_resources_tags(self.resource_type, self.region)
             sorted_tag_values_inventory, lambda_resources_status = functions_inventory.get_lambda_tag_values(**self.session_credentials)
@@ -620,40 +885,53 @@ class resources_tags:
             sorted_tag_values_inventory, eks_clusters_status = clusters_inventory.get_eks_clusters_values(**self.session_credentials) 
             return sorted_tag_values_inventory, eks_clusters_status
         
+        elif self.unit == 'rdsclusters':
+            rds_clusters_inventory = rds_resources_tags(self.resource_type, self.region)
+            sorted_tag_values_inventory, rds_resources_status = rds_clusters_inventory.get_rds_tag_values(**self.session_credentials)
+            return sorted_tag_values_inventory, rds_resources_status
+        
         #Remove duplicate tags & sort
         sorted_tag_values_inventory = list(set(sorted_tag_values_inventory))
         sorted_tag_values_inventory.sort(key=str.lower)
 
         return sorted_tag_values_inventory, my_status.get_status()
 
-    #Setter method to update tags on user-selected resources 
+    # Purpose:  Setter method to update tags on user-selected resources
+    # Input arguments are Boto3 session credentials, list of resource ID's to tag & list of tag dictionaries
     def set_resources_tags(self, resources_to_tag, chosen_tags, **session_credentials):
-
+        self.resources_to_tag = resources_to_tag
+        self.chosen_tags = chosen_tags
         resources_updated_tags = dict()
         my_status = execution_status()
 
         self.session_credentials = dict()
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
+        self.session_credentials = session_credentials
+        
+        if session_credentials.get('multi_account_role_session'):
+            client = session_credentials['multi_account_role_session'].client(self.resource_type, region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            client = this_session.client(self.resource_type, region_name=self.region)
 
         if self.unit == 'instances':
             try:
-                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
-                for resource_id in resources_to_tag:
+                if session_credentials.get('multi_account_role_session'):
+                    selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+                else:
+                    selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                for resource_id in self.resources_to_tag:
                         resource_tag_list = []
                         instance = selected_resource_type.Instance(resource_id)
                         resource_tag_list = instance.create_tags(
-                            Tags=chosen_tags
+                            Tags=self.chosen_tags
                         )
                 resources_updated_tags[resource_id] = resource_tag_list
                 my_status.success(message='Tags updated successfully!')
             except botocore.exceptions.ClientError as error:
-                log.error("Boto3 API returned error: resource {} - {}".format(resource_id, error))
+                log.error("Boto3 API returned error: resource {} - {} - {}".format(sys._getframe().f_code.co_name, resource_id, error))
                 #log.error(error.response)
                 resources_updated_tags["No Resources Found"] = "No Tags Applied"
                 if error.response['Error']['Code'] == 'AccessDeniedException' or \
@@ -662,19 +940,24 @@ class resources_tags:
                     my_status.error(message='You are not authorized to modify these resources')
                 else:
                     my_status.error()
+            resources_status = my_status.get_status()
+
         elif self.unit == 'volumes':
             try:
-                selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
-                for resource_id in resources_to_tag:
+                if session_credentials.get('multi_account_role_session'):
+                    selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+                else:
+                    selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                for resource_id in self.resources_to_tag:
                         resource_tag_list = []
                         volume = selected_resource_type.Volume(resource_id)
                         resource_tag_list = volume.create_tags(
-                            Tags=chosen_tags
+                            Tags=self.chosen_tags
                         )
                 resources_updated_tags[resource_id] = resource_tag_list
                 my_status.success(message='Tags updated successfully!')
             except botocore.exceptions.ClientError as error:
-                log.error("Boto3 API returned error: resource {} - {}".format(resource_id, error))
+                log.error("Boto3 API returned error: resource {} - {} - {}".format(sys._getframe().f_code.co_name, resource_id, error))
                 #log.error(error.response)
                 resources_updated_tags["No Resources Found"] = "No Tags Applied"
                 if error.response['Error']['Code'] == 'AccessDeniedException' or \
@@ -683,21 +966,21 @@ class resources_tags:
                     my_status.error(message='You are not authorized to modify these resources')
                 else:
                     my_status.error()
+            resources_status = my_status.get_status()
+
         elif self.unit == 'buckets':
-            for resource_id in resources_to_tag:
+            for resource_id in self.resources_to_tag:
                 tag_set_dict = dict()
                 resource_tag_list = list()
                 current_applied_tags = dict()
                 try:
-                    client = this_session.client(self.resource_type, region_name=self.region)
                     current_applied_tags = client.get_bucket_tagging(
                         Bucket=resource_id
                     )
                     log.debug("The existing tags for {} are {}".format(resource_id, current_applied_tags))
                 except botocore.exceptions.ClientError as error:
-                    errorString = "Boto3 API returned error: resource {} - {}"
-                    log.error(errorString.format(resource_id, error))
-                    #log.error(error.response)
+                    errorString = "Boto3 API returned error: resource {} - {} - {}"
+                    log.error(errorString.format(sys._getframe().f_code.co_name, resource_id, error))
                     if error.response['Error']['Code'] == 'AccessDeniedException' or \
                         error.response['Error']['Code'] == 'UnauthorizedOperation' or \
                         error.response['Error']['Code'] == 'AccessDenied':  
@@ -706,13 +989,16 @@ class resources_tags:
                         my_status.error()
                 if current_applied_tags.get('TagSet'):
                     for current_tag in current_applied_tags['TagSet']:
-                        for new_tag in chosen_tags:
+                        for new_tag in self.chosen_tags:
                             if new_tag['Key'] != current_tag['Key']:
-                                chosen_tags.append(current_tag)
-                tag_set_dict['TagSet'] = chosen_tags
+                                self.chosen_tags.append(current_tag)
+                tag_set_dict['TagSet'] = self.chosen_tags
                 log.debug("The chosen tags for {} are {}".format(resource_id, tag_set_dict))
                 try:
-                    selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
+                    if session_credentials.get('multi_account_role_session'):
+                        selected_resource_type = session_credentials['multi_account_role_session'].resource(self.resource_type, region_name=self.region)
+                    else:
+                        selected_resource_type = this_session.resource(self.resource_type, region_name=self.region)
                     bucket_tagging = selected_resource_type.BucketTagging(resource_id)
                     resource_tag_list = bucket_tagging.put(
                         Tagging=tag_set_dict
@@ -721,8 +1007,8 @@ class resources_tags:
                     my_status.success(message='Tags updated successfully!')
                     log.debug("These tags are applied to the {} bucket: {}".format(resource_id, resource_tag_list))
                 except botocore.exceptions.ClientError as error:
-                    errorString = "Boto3 API returned error. function: {} - {}"
-                    log.error(errorString.format(resource_id, error))
+                    errorString = "Boto3 API returned error. function: {} - {} - {}"
+                    log.error(errorString.format(sys._getframe().f_code.co_name, resource_id, error))
                     #log.error(error.response)
                     resources_updated_tags["No Resources Found"] = "No Tags Applied"
                     if error.response['Error']['Code'] == 'AccessDeniedException' or \
@@ -731,14 +1017,18 @@ class resources_tags:
                         my_status.error(message='You are not authorized to modify these resources')
                     else:
                         my_status.error()
+            resources_status = my_status.get_status()
+
         elif self.unit == 'functions':
             functions_inventory = lambda_resources_tags(self.resource_type, self.region)
-            lambda_resources_status = functions_inventory.set_lambda_resources_tags(resources_to_tag, chosen_tags, **self.session_credentials)
-            return lambda_resources_status
+            resources_status = functions_inventory.set_lambda_resources_tags(self.resources_to_tag, self.chosen_tags, **self.session_credentials)
         
         elif self.unit == 'clusters':
             clusters_inventory = eks_clusters_tags(self.resource_type, self.region)
-            eks_clusters_status = clusters_inventory.set_eks_clusters_tags(resources_to_tag, chosen_tags, **self.session_credentials) 
-            return eks_clusters_status
+            resources_status = clusters_inventory.set_eks_clusters_tags(self.resources_to_tag, self.chosen_tags, **self.session_credentials) 
+        
+        elif self.unit == 'rdsclusters':
+            rds_clusters_inventory = rds_resources_tags(self.resource_type, self.region)
+            resources_status = rds_clusters_inventory.set_rds_resources_tags(self.resources_to_tag, self.chosen_tags, **self.session_credentials)
 
-        return my_status.get_status()
+        return resources_status

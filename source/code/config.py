@@ -20,37 +20,44 @@ log = logging.getLogger(__name__)
 # Define AWS Config class to get/set items using Boto3
 class config:
     
-    #Class constructor
+    #Class initializer
     def __init__(self, region, **session_credentials):
         self.region = region
-        self.session_credentials = {}
-        self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
-        self.session_credentials['SecretKey'] = session_credentials['SecretKey']
-        self.session_credentials['SessionToken'] = session_credentials['SessionToken']
-        this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretKey'],
-            aws_session_token=self.session_credentials['SessionToken'])
-        self.config_client = this_session.client('config', region_name=self.region)
+        self.session_credentials = dict()
+        self.session_credentials = session_credentials
+        
+        if session_credentials.get('multi_account_role_session'):
+            self.client = session_credentials['multi_account_role_session'].client('config', region_name=self.region)
+        else:
+            this_session = boto3.session.Session(
+                aws_access_key_id=self.session_credentials.get('AccessKeyId'),
+                aws_secret_access_key=self.session_credentials.get('SecretKey'),
+                aws_session_token=self.session_credentials.get('SessionToken'))
+            self.client = this_session.client('config', region_name=self.region)
 
     #Get REQUIRED_TAGS Config Rule name & input parameters
-    def get_config_rule(self, config_rule_id):
+    def get_config_rule(self, config_rule_name):
         my_status = execution_status()
         required_tags_config_rules = dict()
         try:
-            response = self.config_client.describe_config_rules()
+            response = self.client.describe_config_rules(
+                ConfigRuleNames=[
+                    config_rule_name
+                ]
+            )
             all_config_rules = dict()
-            all_config_rules = response['ConfigRules']
+            all_config_rules = response.get('ConfigRules')
             input_parameters_dict = dict()
             for rule in all_config_rules:
-                if rule['Source']['SourceIdentifier'] == 'REQUIRED_TAGS':
-                    input_parameters_dict = json.loads(rule['InputParameters'])
-                    required_tags_config_rules['ConfigRuleName'] = rule['ConfigRuleName']
-                    required_tags_config_rules['ComplianceResourceTypes'] = rule['Scope']['ComplianceResourceTypes']
+                if rule.get('Source').get('SourceIdentifier') == 'REQUIRED_TAGS':
+
+                    input_parameters_dict = json.loads(rule.get('InputParameters'))
+                    required_tags_config_rules['ConfigRuleName'] = rule.get('ConfigRuleName')
+                    required_tags_config_rules['ComplianceResourceTypes'] = rule.get('Scope').get('ComplianceResourceTypes')
                     for key, value in input_parameters_dict.items():
                         required_tags_config_rules[key] = value
                     input_parameters_dict.clear()
-            my_status.success(message='\"required-tags\" Config rules found!')
+                    my_status.success(message='\"required-tags\" Config rules found!')
         except botocore.exceptions.ClientError as error:
                 errorString = "Boto3 API returned error: {}"
                 log.error(errorString.format(error))
@@ -68,11 +75,11 @@ class config:
         all_config_rules = dict()
         config_rules_ids_names = dict()
         try:
-            response = self.config_client.describe_config_rules()
-            all_config_rules = response['ConfigRules']
+            response = self.client.describe_config_rules()
+            all_config_rules = response.get('ConfigRules')
             for configRule in all_config_rules:
-                if configRule['Source']['SourceIdentifier'] == 'REQUIRED_TAGS':
-                    config_rules_ids_names[configRule['ConfigRuleId']] = configRule['ConfigRuleName']
+                if configRule.get('Source').get('SourceIdentifier') == 'REQUIRED_TAGS':
+                    config_rules_ids_names[configRule.get('ConfigRuleId')] = configRule.get('ConfigRuleName')
             if len(config_rules_ids_names):
                 my_status.success(message='\"required-tags\" Config rules found!')
             else:
@@ -91,20 +98,20 @@ class config:
         return config_rules_ids_names, my_status.get_status()
 
     #Set REQUIRED_TAGS Config Rule
-    def set_config_rules(self, tag_groups_keys_values, config_rule_id):
+    def set_config_rules(self, tag_groups_keys_values, config_rule_id, config_rule_name):
         my_status = execution_status()
         if len(tag_groups_keys_values) and config_rule_id:
             # convert selected Tag Groups into JSON for Boto3 input to
             # this Config Rule's underlying Lambda :
             input_parameters_json = json.dumps(tag_groups_keys_values)
             config_rule_current_parameters = dict()
-            config_rule_current_parameters, config_rule_current_parameters_execution_status = self.get_config_rule(config_rule_id)
+            config_rule_current_parameters, config_rule_current_parameters_execution_status = self.get_config_rule(config_rule_name)
             try:
-                self.config_client.put_config_rule(
+                self.client.put_config_rule(
                     ConfigRule={
                         'ConfigRuleId': config_rule_id,
                         'Scope': {
-                            'ComplianceResourceTypes': config_rule_current_parameters['ComplianceResourceTypes']
+                            'ComplianceResourceTypes': config_rule_current_parameters.get('ComplianceResourceTypes')
                         },
                         'InputParameters': input_parameters_json,
                         'Source': {

@@ -33,7 +33,7 @@ class service_catalog:
     def __init__(self, region, **session_credentials):
         self.my_status = execution_status()
         self.region = region
-        self.session_credentials = {}
+        self.session_credentials = dict()
         self.session_credentials['AccessKeyId'] = session_credentials['AccessKeyId']
         self.session_credentials['SecretKey'] = session_credentials['SecretKey']
         self.session_credentials['SessionToken'] = session_credentials['SessionToken']
@@ -197,6 +197,7 @@ class service_catalog:
             product_template_details = self.service_catalog_client.describe_product_as_admin(
                 Id=sc_product_template_id
             )
+            self.my_status.success()
             current_status = self.my_status.get_status()
             if current_status['alert_level'] == 'success':
                 self.my_status.success(message='Service Catalog product template found!')
@@ -223,6 +224,7 @@ class service_catalog:
                         ResourceId=sc_product_template_id,
                         TagOptionId=to_id
                     )
+                    self.my_status.success()
                     current_status = self.my_status.get_status()
                     if current_status['alert_level'] == 'success':
                         self.my_status.success(message='New Tag Option associated with Service Catalog product!')
@@ -239,6 +241,7 @@ class service_catalog:
             product_template_details = self.service_catalog_client.describe_product_as_admin(
                 Id=sc_product_template_id
             )
+            self.my_status.success()
             current_status = self.my_status.get_status()
             if current_status['alert_level'] == 'success':
                 self.my_status.success(message='Service Catalog product template found!')

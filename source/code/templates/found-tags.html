@@ -32,43 +32,75 @@ SPDX-License-Identifier: MIT-0 -->
     {% endfor %}
     {% endif %}
     {% endwith %}
+    <table class="table table-borderless">
+      <tbody>
+        <tr>
+          <td>
+            <form method="get" action="{{ url_for('download_file') }}">
+              <button type="submit" class="btn btn-primary btn-lg">Download Results</button>
+            </form>
+          </td>
+        </tr>
+      </tbody>
+    </table>
     <table style="width: 800px" class="table table-bordered table-striped">
-      {% for instance, tags in inventory.items() %}
-      <tr>
-        <thead>
-          <th scope="col">Resource ID</th>
-          <th scope="col">Found Tags</th>
-        </thead>
-        <td>{{ instance }}</td>
-        <td>
-          <table
-            style="width: 600px"
-            class="table table-sm table-bordered table-striped"
-          >
+      {% for account_number, per_account_inventory in all_inventory.items() %}
+        {% for region, region_inventory in per_account_inventory.items() %}
+          {% for instance, tags in region_inventory.items() %}
+          <tr>
             <thead>
-              <tr>
-                <th scope="col">Found Tag Key</th>
-                <th scope="col">Found Tag Value</th>
-              </tr>
+              <th scope="col">Account Number</th>
+              <th scope="col">Region</th>
+              <th scope="col">Resource ID</th>
+              <th scope="col">Found Tags</th>
             </thead>
-            <tbody>
-              {% for found_key, found_value in tags.items() %}
-              <tr>
-                <td>{{ found_key }}</td>
-                <td>{{ found_value }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </td>
-      </tr>
+            <td>{{ account_number }}</td>
+            <td>{{ region }}</td>
+            <td>{{ instance }}</td>
+            <td>
+              <table
+                style="width: 600px"
+                class="table table-sm table-bordered table-striped"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">Found Tag Key</th>
+                    <th scope="col">Found Tag Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for found_key, found_value in tags.items() %}
+                  <tr>
+                    <td>{{ found_key }}</td>
+                    <td>{{ found_value }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          {% endfor %}
+        {% endfor %}
       {% endfor %}
     </table>
 
     <div class="container">
-      <form method="get" action="{{ url_for('actions') }}">
-        <button type="submit" class="btn btn-primary btn-lg">Home</button>
-      </form>
+      <table class="table table-borderless">
+        <tbody>
+          <tr>
+              <td>
+                <form method="get" action="{{ url_for('actions') }}">
+                  <button type="submit" class="btn btn-primary btn-lg">Home</button>
+                </form>
+              </td>
+              <td>
+                <form method="get" action="{{ url_for('download_file') }}">
+                <button type="submit" class="btn btn-primary btn-lg">Download Results</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>  
     </div>
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
