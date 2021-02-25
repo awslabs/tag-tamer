@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: AWS Cloudformation template for TagTamer solution components - version - RC13
+Description: AWS Cloudformation template for TagTamer solution components - version - RC16
 Metadata: 
   AWS::CloudFormation::Interface: 
     ParameterGroups: 
@@ -136,12 +136,12 @@ Resources:
             Principal:
               Service:
                 - ec2.amazonaws.com
-                - s3.amazonaws.com
-                - dynamodb.amazonaws.com
-                - cloudformation.amazonaws.com
             Action:
               - 'sts:AssumeRole'
       RoleName: TagTamerRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
     Metadata:
         cfn_nag:
           rules_to_suppress:
@@ -213,8 +213,11 @@ Resources:
             #!/bin/bash -xe
             cd /var/tmp
             yum -y install git dos2unix
-            git clone git clone https://github.com/billdry/tag-tamer.git
-            cd tagtamer/source
+            git clone https://github.com/billdry/tag-tamer.git
+            cd /var/tmp/tag-tamer/source/code
+            dos2unix tag_tamer_parameters.json
+            sed -i -e 's/"base_region": "us-east-1",/"base_region": "${AWS::Region}",/' tag_tamer_parameters.json
+            cd /var/tmp/tag-tamer/source
             dos2unix tagtamer-install.sh
             bash tagtamer-install.sh
       Tags:
