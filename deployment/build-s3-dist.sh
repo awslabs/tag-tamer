@@ -73,3 +73,8 @@ sed -i -e $replace $template_dist_dir/*.template
 replace="s/%%VERSION%%/$3/g"
 echo "sed -i -e $replace $template_dist_dir/*.template"
 sed -i -e $replace $template_dist_dir/*.template
+echo "cd $build_dist_dir"
+cd $build_dist_dir
+echo "touch place-holder-file.txt"
+touch place-holder-file.txt
+cd ..
