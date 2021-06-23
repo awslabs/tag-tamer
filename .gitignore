@@ -1,5 +1,8 @@
 tag-tamer-workspace.code-workspace
 .vscode/settings.json
+.vscode/.ropeproject/config.py
+.vscode/.ropeproject/objectdb
+.vscode/launch.json
 source/code/log/tag_tamer.log
 source/code/__pycache__/admin.cpython-38.pyc
 source/code/__pycache__/cognito_idp.cpython-38.pyc
@@ -22,8 +25,3 @@ source/code/__pycache__/redshift_cluster_tags.cpython-38.pyc
 source/code/__pycache__/tag-tamer-run.cpython-38.pyc
 source/code/__pycache__/dynamodb_resources_tags.cpython-38.pyc
 source/code/__pycache__/ecr_resources_tags.cpython-38.pyc
-source/code/downloads/bdry-download.csv
-.vscode/.ropeproject/config.py
-.vscode/.ropeproject/objectdb
-.VSCodeCounter/2021-05-03_17-19-25/results.txt
-.vscode/launch.json
