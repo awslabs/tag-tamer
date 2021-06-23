@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: (SO0132) AWS Cloudformation template for Tag Tamer solution components - (Version %%VERSION%% )
+Description: (SO0132) AWS CloudFormation template for Tag Tamer solution components - (Version v1.0.0 )
 Metadata: 
   AWS::CloudFormation::Interface: 
     ParameterGroups: 
