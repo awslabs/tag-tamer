@@ -24,7 +24,32 @@ SPDX-License-Identifier: MIT-0 -->
     <br />
     <div class="container">
       <form method="post" action="{{ url_for('found_tags') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="rdsRadio"
+            value="rds"
+            name="resource_type"
+            checked
+          />
+          <label class="form-check-label" for="rdsRadio"
+            >Amazon Aurora DB Clusters</label
+          >
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="dynamodbRadio"
+            value="dynamodb"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="dynamodbRadio"
+            >Amazon DynamoDB Tables</label
+          >
+        </div>
         <div class="form-check">
           <input
             class="form-check-input"
@@ -32,9 +57,10 @@ SPDX-License-Identifier: MIT-0 -->
             id="ebsRadio"
             value="ebs"
             name="resource_type"
-            checked
           />
-          <label class="form-check-label" for="ebsRadio">Amazon EBS Volumes</label>
+          <label class="form-check-label" for="ebsRadio"
+            >Amazon EBS Volumes</label
+          >
         </div>
         <div class="form-check">
           <input
@@ -44,7 +70,21 @@ SPDX-License-Identifier: MIT-0 -->
             value="ec2"
             name="resource_type"
           />
-          <label class="form-check-label" for="ec2Radio">Amazon EC2 Instances</label>
+          <label class="form-check-label" for="ec2Radio"
+            >Amazon EC2 Instances</label
+          >
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="ecrRadio"
+            value="ecr"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="ecrRadio"
+            >Amazon ECR Repositories</label
+          >
         </div>
         <div class="form-check">
           <input
@@ -54,17 +94,33 @@ SPDX-License-Identifier: MIT-0 -->
             value="eks"
             name="resource_type"
           />
-          <label class="form-check-label" for="eksRadio">Amazon EKS Clusters</label>
+          <label class="form-check-label" for="eksRadio"
+            >Amazon EKS Clusters</label
+          >
         </div>
         <div class="form-check">
           <input
             class="form-check-input"
             type="radio"
-            id="lambdaRadio"
-            value="lambda"
+            id="rdsInstancesRadio"
+            value="rdsInstances"
             name="resource_type"
           />
-          <label class="form-check-label" for="lambdaRadio">AWS Lambda Functions</label>
+          <label class="form-check-label" for="rdsInstancesRadio"
+            >Amazon RDS Instances</label
+          >
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="redshiftClustersRadio"
+            value="redshift"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="redshiftClustersRadio"
+            >Amazon Redshift Clusters</label
+          >
         </div>
         <div class="form-check">
           <input
@@ -74,7 +130,45 @@ SPDX-License-Identifier: MIT-0 -->
             value="s3"
             name="resource_type"
           />
-          <label class="form-check-label" for="bucketRadio">Amazon S3 Buckets</label>
+          <label class="form-check-label" for="bucketRadio"
+            >Amazon S3 Buckets</label
+          >
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="codecommitRadio"
+            value="codecommit"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="codecommitRadio"
+            >AWS CodeCommit Repositories</label
+          >
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="codepipelineRadio"
+            value="codepipeline"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="codepipelineRadio"
+            >AWS CodePipelines</label
+          >
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            id="lambdaRadio"
+            value="lambda"
+            name="resource_type"
+          />
+          <label class="form-check-label" for="lambdaRadio"
+            >AWS Lambda Functions</label
+          >
         </div>
         <button type="submit" class="btn btn-primary btn-lg">Find Tags</button>
       </form>

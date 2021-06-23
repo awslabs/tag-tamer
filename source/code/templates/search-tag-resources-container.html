@@ -22,20 +22,34 @@ SPDX-License-Identifier: MIT-0 -->
     <div class="container-fluid">
       <div class="row">
         <!-- <div class="embed-responsive"> -->
-          <iframe
-            class="embed-responsive-item"
-            src="{{ url_for('tag_based_search', destination_route=destination_route, resource_type=resource_type) }}"
-            style="position: absolute; border: none; top: 0px; height: 320px; width: 100%"
-            name="tag_search_top_iframe"
-          ></iframe>
+        <iframe
+          class="embed-responsive-item"
+          src="{{ url_for('tag_based_search', destination_route=destination_route, resource_type=resource_type) }}"
+          style="
+            position: absolute;
+            border: none;
+            top: 0px;
+            height: 320px;
+            width: 100%;
+          "
+          name="tag_search_top_iframe"
+          title="Tag Search Choices"
+        ></iframe>
         <!-- </div>
         <div class="embed-responsive"> -->
-          <iframe
-            class="embed-responsive-item"
-            src=""
-            style="position: absolute; border: none; top: 321px; height: 100%; width: 100%"
-            name="tag_bottom_iframe"
-          ></iframe>
+        <iframe
+          class="embed-responsive-item"
+          src=""
+          style="
+            position: absolute;
+            border: none;
+            top: 321px;
+            height: 100%;
+            width: 100%;
+          "
+          name="tag_bottom_iframe"
+          title="Tag Search Response"
+        ></iframe>
         <!-- </div> -->
       </div>
     </div>

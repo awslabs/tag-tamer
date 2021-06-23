@@ -1,26 +1,27 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: AWS Cloudformation template for TagTamer solution components - version - RC17
+Description: (SO0132) AWS Cloudformation template for Tag Tamer solution components - (Version %%VERSION%% )
 
 Metadata: 
   AWS::CloudFormation::Interface: 
     ParameterGroups: 
       - Label:
           default: "Amazon EC2 Configuration"
-        Parameters: 
-          - KeyName
+        Parameters:
+        # If you would like to use SSH, please uncomment all template areas that use the SSK Key 
+        #  - KeyName
           - AMIID
       - Label:
-          default: "ALB Configuration"
+          default: "AWS ALB Configuration"
         Parameters: 
           - Certificate
           - CIDRIPRange
       - Label:
-          default: "Cognito User Pool configuration for Authentication"
+          default: "Amazon Cognito User Pool configuration for Authentication"
         Parameters: 
           - Email
           - TagTamerUserPoolName
       - Label:
-          default: "Cognito Identity Pool configuration"
+          default: "Amazon Cognito Identity Pool configuration"
         Parameters: 
           - TagTamerIdentityPoolName
       - Label:
@@ -29,11 +30,11 @@ Metadata:
            - TagTamerMultiAccounts
 
 Parameters:
-  KeyName:
-    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
-    Type: 'AWS::EC2::KeyPair::KeyName'
-    ConstraintDescription: must be the name of an existing EC2 KeyPair.
-    Default: yourkeyname
+  #KeyName:
+  #  Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+  #  Type: 'AWS::EC2::KeyPair::KeyName'
+  #  ConstraintDescription: must be the name of an existing Amazon EC2 KeyPair.
+  #  Default: yourkeyname
   AMIID:
     Description: Select Amazon Linux AMI to use for Tag Tamer solution. Recommend to use amzn2-ami-hvm-x86_64-gp2.
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
@@ -65,7 +66,8 @@ Parameters:
   TagTamerMultiAccounts:
     Type: String
     Description: Comma separated list of AWS account numbers Tag Tamer should manage.  Do not include the AWS account number where the Tag Tamer EC2 instance is deployed.
-  
+    Default: '1'
+
 Mappings:
   SourceCode:
     General:
@@ -88,7 +90,7 @@ Resources:
         cfn_nag:
           rules_to_suppress:
           - id: W60
-            reason: "Customers may enable VPC flow logs for this VPC if they choose."
+            reason: "Customers may enable Amazon Virtual Private Cloud (VPC) flow logs for this VPC if they choose."
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -186,7 +188,7 @@ Resources:
       - Key: Name
         Value: Tagtamer-Private-route
 
-  PrivateRoute1:            # Private route table can access web via NAT (created below)
+  PrivateRoute1: # Private route table can access web via NAT (created below)
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref PrivateRouteTable
@@ -217,7 +219,6 @@ Resources:
       SubnetId: !Ref PrivateSubnetB
       RouteTableId: !Ref PrivateRouteTable
 
-
   PublicLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     DependsOn: AttachGateway
@@ -237,8 +238,12 @@ Resources:
       SecurityGroupEgress:
         - IpProtocol: tcp
           CidrIp: '0.0.0.0/0'
-          FromPort: 0
-          ToPort: 65535
+          FromPort: 22
+          ToPort: 22
+        - IpProtocol: tcp
+          CidrIp: '0.0.0.0/0'
+          FromPort: 443
+          ToPort: 443
       Tags:
       - Key: Name
         Value: Tagtamer-PublicLoadBalancerSecurityGroup
@@ -246,11 +251,9 @@ Resources:
         cfn_nag:
           rules_to_suppress:
           - id: W5
-            reason: "Works as designed"
+            reason: "Works as designed.  Customers may limit the destination IP addresses to specific repos & services based on their policies."
           - id: W36
             reason: "This Security Group includes a description."
-          - id: W29
-            reason: "Works as designed"
 
   PublicLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -269,7 +272,7 @@ Resources:
         cfn_nag:
           rules_to_suppress:
           - id: W28
-            reason: "Works as designed"
+            reason: "Works as designed.  Tag Tamer will not replace this resource.  The name clearly denotes its use in the Tag Tamer solution."
           - id: W52
             reason: "Tag Tamer customers may enable access logs if they choose."
 
@@ -330,15 +333,12 @@ Resources:
       AttributeDefinitions:
         - AttributeName: tag_group_name
           AttributeType: S
-      BillingMode: 'PROVISIONED'
+      BillingMode: 'PAY_PER_REQUEST'
       KeySchema:
         - AttributeName: tag_group_name
           KeyType: HASH
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: True
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
       TableName: tag_tamer_tag_groups
     Metadata:
         cfn_nag:
@@ -346,7 +346,7 @@ Resources:
           - id: W74
             reason: "Encrypted using AWS-owned CMK.  Customers may change this to their CMK if desired."
           - id: W28
-            reason: "Works as designed"
+            reason: "Works as designed.  Tag Tamer will not replace this resource.  The name clearly denotes its use in the Tag Tamer solution."
   TagTamerRolesTable:
     Type: 'AWS::DynamoDB::Table'
     Properties:
@@ -369,7 +369,7 @@ Resources:
           - id: W74
             reason: "Encrypted using AWS-owned CMK.  Customers may change this to their CMK if desired."
           - id: W28
-            reason: "Works as designed"
+            reason: "Works as designed.  Tag Tamer will not replace this resource.  The name clearly denotes its use in the Tag Tamer solution."
   TagTamerRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -390,7 +390,7 @@ Resources:
         cfn_nag:
           rules_to_suppress:
           - id: W28
-            reason: "Works as designed"
+            reason: "Works as designed.  Tag Tamer will not replace this resource.  The name clearly denotes its use in the Tag Tamer solution."
   TagTamerInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
@@ -406,14 +406,6 @@ Resources:
       GroupName: SG-TagTamer
       VpcId: !Ref VPC
       SecurityGroupIngress:
-        #- IpProtocol: tcp
-        #  FromPort: 80
-        #  ToPort: 80
-        #  CidrIp: 0.0.0.0/0
-        #- IpProtocol: tcp
-        #  FromPort: 22
-        #  ToPort: 22
-        #  CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
@@ -421,38 +413,45 @@ Resources:
       SecurityGroupEgress:
         - IpProtocol: tcp
           CidrIp: '0.0.0.0/0'
-          FromPort: 0
-          ToPort: 65535
+          FromPort: 22
+          ToPort: 22
+        - IpProtocol: tcp
+          CidrIp: '0.0.0.0/0'
+          FromPort: 80
+          ToPort: 80
+        - IpProtocol: tcp
+          CidrIp: '0.0.0.0/0'
+          FromPort: 443
+          ToPort: 443
     Metadata:
         cfn_nag:
           rules_to_suppress:
           - id: W2
             reason: "Tag Tamer customer may limit ingress CIDR to specific IP ranges for their users."
           - id: W28
-            reason: "Works as designed"
-          - id: W29
-            reason: "Works as designed"
+            reason: "Works as designed.  Tag Tamer will not replace this resource.  The name clearly denotes its use in the Tag Tamer solution."
           - id: W5
-            reason: "Works as designed"
+            reason: "Works as designed.  Customers may limit the destination IP addresses to specific repos & services based on their policies."
           - id: W9
-            reason: "Works as designed"
+            reason: "Works as designed.  Customers may limit the ingress IP range if they choose."
           - id: W36
             reason: "This Security Group includes a description."
   EC2Instance:
     Type: 'AWS::EC2::Instance'
     Properties:
-      InstanceType: t2.micro
+      InstanceType: t3.micro
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
-            VolumeType: gp2
+            # VolumeType: gp2
+            VolumeType: gp3
             VolumeSize: 8
             DeleteOnTermination: true
             Encrypted: true
       SecurityGroupIds:
         - !GetAtt "InstanceSecurityGroup.GroupId"
       ImageId: !Ref AMIID
-      KeyName: !Ref KeyName
+      #KeyName: !Ref KeyName
       SubnetId: !Ref PrivateSubnetA
       IamInstanceProfile: !Ref TagTamerInstanceProfile
       UserData:
@@ -473,13 +472,7 @@ Resources:
           Value: Tag Tamer Web App
         - Key: Usage
           Value: Tag Tamer Solution UI
-#  EC2InstanceEIP:
-#    Type: 'AWS::EC2::EIP'
-#    Properties:
-#      Domain: vpc
-#      InstanceId: !Ref EC2Instance
-#    DependsOn:
-#      - EC2Instance
+  
   TagTamerWebAppEC2InstancePolicy:
     Type: 'AWS::IAM::Policy'
     Properties:
@@ -705,14 +698,6 @@ Resources:
       Type: String
       Value: !Ref TagTamerUserPoolClient
 
-  TagTamerCognitoAppClientSecret:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: /tag-tamer/cognito-app-client-secret-value
-      Type: String
-      Value: !GetAtt UserPoolClientInputs.appSecret
-    DependsOn: UserPoolClientInputs
-
   TagTamerCognitoRedirectURL:
     Type: AWS::SSM::Parameter
     Properties:
@@ -762,11 +747,10 @@ Resources:
       Type: String
       Value: !Ref TagTamerMultiAccounts
 
-  UserPoolClientRole:
-  # Created to execute Lambda which gets userpool app client config values
-    Type: 'AWS::IAM::Role'
+# Created to start Lambda which gets userpool app client config values
+  TagTamerLambdaRole:
+    Type: AWS::IAM::Role
     Properties:
-      RoleName: TagTamer-LambdaRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -775,13 +759,46 @@ Resources:
               Service:
                 - lambda.amazonaws.com
             Action:
-              - 'sts:AssumeRole'
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: TagTamerLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter
+                  - kms:Encrypt
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cognito-idp:DescribeUserPoolClient
+                Resource: "*"
     Metadata:
         cfn_nag:
           rules_to_suppress:
-          - id: W28
-            reason: "Works as designed"
-    DependsOn: TagTamerUserPoolClient
+          - id: W11
+            reason: "Works as designed.  Tag Tamer creates multiple Amazon CloudWatch Logs for Lambda & SSM parameters dynamically."  
+
+  UserPoolClientInputs:
+  # Values passed to Userpool client Lambda
+  # Depends on UserPool for Id
+  # Depends on UserPoolClient for Id
+  # Marked as depending on UserPoolClientLambdaPolicy for easier to understand CFN sequencing
+    Type: 'Custom::LambdaCallout'
+    Properties:
+      ServiceToken: !GetAtt UserPoolClientLambda.Arn
+      clientId: !Ref TagTamerUserPoolClient
+      userpoolId: !Ref TagTamerCognitoUserPool
+    DependsOn: UserPoolClientLambda
 
   UserPoolClientLambda:
   # Lambda which gets userpool app client config values
@@ -814,67 +831,105 @@ Resources:
             - ' }'
             - '};'
       Handler: index.handler
-      Runtime: nodejs10.x
+      Role: !GetAtt TagTamerLambdaRole.Arn
+      Runtime: nodejs12.x
       Timeout: 300
-      Role: !GetAtt 
-        - UserPoolClientRole
-        - Arn
     Metadata:
         cfn_nag:
           rules_to_suppress:
           - id: W58
-            reason: "Works as designed"
-    DependsOn: UserPoolClientRole
+            reason: "Works as designed.  The attached role includes permissions to write to Amazon CloudWatch logs."
+          - id: W89
+            reason: "Works as designed.  This Lambda function retrieves the new Cognito ClientID & UserPoolId parameters.  There is no VPC established & Amazon Cognito does not support private link."
+          - id: W92
+            reason: "This Lambda function executes only once during Tag Tamer installation."
+    DependsOn: TagTamerLambdaRole
 
-  UserPoolClientLambdaPolicy:
-  # Sets userpool policy for the role that executes the Userpool Client Lambda
-  # Depends on UserPool for Arn
-  # Marked as depending on UserPoolClientRole for easier to understand CFN sequencing
-    Type: 'AWS::IAM::Policy'
-    Properties:
-      PolicyName: TagTamer-Lambda-Policy
-      Roles: 
-        - !Ref UserPoolClientRole
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Action:
-              - 'cognito-idp:DescribeUserPoolClient'
-            Resource: !GetAtt TagTamerCognitoUserPool.Arn
-    DependsOn: UserPoolClientLambda
-  UserPoolClientLogPolicy:
-  # Sets log policy for the role that executes the Userpool Client Lambda
-  # Depends on UserPool for Arn
-  # Marked as depending on UserPoolClientLambdaPolicy for easier to understand CFN sequencing
-    Type: 'AWS::IAM::Policy'
-    Properties:
-      PolicyName: TagTamer-LambdaLog-Policy
-      Roles: 
-        - !Ref UserPoolClientRole
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - 'logs:CreateLogGroup'
-              - 'logs:CreateLogStream'
-              - 'logs:PutLogEvents'
-            Resource: !Sub  
-              - arn:aws:logs:${region}:${account}:log-group:/aws/lambda/${lambda}:log-stream:*
-              - { region: !Ref "AWS::Region",  account: !Ref "AWS::AccountId", lambda: !Ref UserPoolClientLambda}
-    DependsOn: UserPoolClientLambdaPolicy  
-  UserPoolClientInputs:
-  # Values passed to Userpool client Lambda
-  # Depends on UserPool for Id
-  # Depends on UserPoolClient for Id
-  # Marked as depending on UserPoolClientLambdaPolicy for easier to understand CFN sequencing
+
+
+# Custom resource for storing secrets in SSM as SecureString
+  TagTamerCognitoAppClientSecretInputs:
     Type: 'Custom::LambdaCallout'
     Properties:
-      ServiceToken: !GetAtt UserPoolClientLambda.Arn
-      clientId: !Ref TagTamerUserPoolClient
-      userpoolId: !Ref TagTamerCognitoUserPool
-    DependsOn: UserPoolClientLogPolicy
+      ServiceToken: !GetAtt TagTamerCognitoAppClientSecretLambda.Arn
+      AppClientSecret: !GetAtt UserPoolClientInputs.appSecret
+      Type: SecureString
+      ParameterName: /tag-tamer/cognito-app-client-secret-value
+    DependsOn: TagTamerCognitoAppClientSecretLambda
+
+  TagTamerCognitoAppClientSecretLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: >
+          var response = require('cfn-response');
+          var aws = require('aws-sdk');
+          exports.handler = function(event, context) {
+              console.log(event);
+
+              var ssm = new aws.SSM();
+              var props = event.ResourceProperties;
+
+              var splitStackArn = event.StackId.split(':');
+              var region = splitStackArn[3];
+              var accountId = splitStackArn[4];
+
+              var stackName = splitStackArn[5].split("/")[1];
+              var paramName = props.ParameterName
+              var paramArn = "arn:aws:ssm:" + region + ":" + accountId + ":parameter/" + paramName;
+              var cb = function(err, resp) {
+                  var cfnRespData = { Arn: paramArn, Name: paramName };
+                  if (err) {
+                      console.log(err);
+                      response.send(event, context, response.FAILED, cfnRespData, paramArn);
+                  } else {
+                      console.log(resp);
+                      response.send(event, context, response.SUCCESS, cfnRespData, paramArn);
+                  }
+              };
+              if (event.RequestType == "Create") {
+                  var params = {
+                      Name: paramName,
+                      Type: props.Type,
+                      Value: props.AppClientSecret,
+                      KeyId: props.KeyId,
+                      Overwrite: false
+                  };
+                  if (props.Description) params.Description = props.Description;
+                  if (props.KeyId) params.KeyId = props.KeyId;
+
+                  ssm.putParameter(params, cb);
+              } else if (event.RequestType == "Update") {
+                  var params = {
+                      Name: paramName,
+                      Type: props.Type,
+                      Value: props.AppClientSecret,
+                      KeyId: props.KeyId,
+                      Overwrite: true
+                  };
+                  if (props.Description) params.Description = props.Description;
+                  if (props.KeyId) params.KeyId = props.KeyId;
+                  ssm.putParameter(params, cb);
+              } else if (event.RequestType == "Delete") {
+                  ssm.deleteParameter({ Name: paramName }, cb);
+              }
+          };
+
+      Handler: index.handler
+      Role: !GetAtt TagTamerLambdaRole.Arn
+      Runtime: nodejs12.x
+      Timeout: 300
+    Metadata:
+        cfn_nag:
+          rules_to_suppress:
+          - id: W58
+            reason: "Works as designed.  The attached role includes permissions to write to Amazon CloudWatch logs."
+          - id: W89
+            reason: "Works as designed.  This Lambda function stores the new Amazon Cognito AppClientSecret.  There is no VPC established & Amazon Cognito does not support private link."
+          - id: W92
+            reason: "This Lambda function executes only once to store an AWS SSM parameter for Amazon Cognito AppClientSecret."
+    DependsOn: TagTamerLambdaRole
+
   
   TagTamerCognitoIdentityPool:
     Type: AWS::Cognito::IdentityPool
@@ -893,11 +948,6 @@ Outputs:
   InstanceId:
     Description: InstanceId of the newly created EC2 instance
     Value: !Ref EC2Instance
-#  AZ:
-#    Description: Availability Zone of the newly created EC2 instance
-#    Value: !GetAtt 
-#      - EC2Instance
-#      - AvailabilityZone
   EC2InstancePrivateIP:
     Description: PrivateIP assigned to EC2Instance
     Value: !GetAtt 
@@ -911,9 +961,3 @@ Outputs:
   TagTamerURL:
     Description: Login URL for Tag Tamer Application
     Value: !Sub https://${PublicLoadBalancer.DNSName}/sign-in
-
-#  PublicIP:
-#    Description: Public IP address of the newly created EC2 instance
-#    Value: !GetAtt 
-#      - EC2Instance
-#      - PublicIp

@@ -2,85 +2,174 @@
 
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-# Tag Tamer's role-based tagger run by AWS Lambda
+# Role-based AWS resource tagger run by AWS Lambda
 
 # Import AWS modules for python
-import boto3, botocore
-from botocore import exceptions
-from boto3.dynamodb.conditions import Key, Attr
+import botocore
+import boto3
 # Import JSON
 import json
+# Import RegEx module
+import re
+# Modules for decoding & decompressing CloudWatch Logs events
+# Import gzip
 #import gzip
-import gzip
+# Import base64
 #import base64
-import base64
 
 def lambda_handler(event, context):
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table('tag_tamer_roles')
     
-    cw_data = event['awslogs']['data']
-    compressed_cw_payload = base64.b64decode(cw_data)
-    uncompressed_cw_payload = gzip.decompress(compressed_cw_payload)
-    payload = json.loads(uncompressed_cw_payload)
-
-    cw_data_dict = json.loads(payload['logEvents'][0]['message'])
+    #Extract & structure encoded & compressed CloudWatch Log event data for parsing
+    #def get_cw_event_data(event):
+    #    pass
+    #    cw_data = event['awslogs']['data']
+    #    compressed_cw_payload = base64.b64decode(cw_data)
+    #    uncompressed_cw_payload = gzip.decompress(compressed_cw_payload)
+    #    payload = json.loads(uncompressed_cw_payload)
+    #    cw_data_dict = json.loads(payload['logEvents'][0]['message'])
+    #    return cw_data_dict
     
-    role_arn = cw_data_dict['userIdentity']['sessionContext']['sessionIssuer']['arn']
-    resource_id = cw_data_dict['responseElements']['instancesSet']['items'][0]['instanceId']
+    #Get uncompressed CloudWatch Event data for parsing API calls
+    def get_unc_cw_event_data(event):
+        cw_data_dict = dict()
+        cw_data_dict = event['detail']
+        return cw_data_dict
 
-    #Get a specified role and assigned tags 
-    def get_role_tags(role_arn):
-        response = dict()
-        response = table.get_item(
-            Key={
-                'role_arn': role_arn
-            },
-            ProjectionExpression="tags"
-        )
-        tags = list()
-        tags = response['Item']['tags']
-        return tags
+    #Get resource tags assigned to a specified IAM role 
+    #Returns a list of key:string,value:string resource tag dictionaries
+    def get_role_tags(role_name):
+        try:
+            client = boto3.client('iam')
+            response = dict()
+            response = client.list_role_tags(
+                RoleName=role_name
+            )
+        except botocore.exceptions.ClientError as error:
+            print("Boto3 API returned error: ", error)
+            print("No Tags Applied To: ", resource_id)
+            no_tags = list()
+            return no_tags
+        return response['Tags']
 
-    role_tags = get_role_tags(role_arn)
+    #Get resource tags stored in AWS SSM Parameter Store 
+    #Returns a list of key:string,value:string resource tag dictionaries
+    def get_ssm_parameter_tags(role_name, user_name):
+        tag_list = list()
+        try:
+            path_string = "/auto-tag/" + role_name + "/" + user_name + "/tag"
+            ssm_client = boto3.client('ssm')
+            get_parameter_response = ssm_client.get_parameters_by_path(
+            Path=path_string,
+            Recursive=True,
+            WithDecryption=True
+            )
+            for parameter in get_parameter_response['Parameters']:
+                tag_dictionary = dict()
+                path_components = parameter['Name'].split("/")
+                tag_key = path_components[-1]
+                tag_dictionary['Key'] = tag_key
+                tag_dictionary['Value'] = parameter['Value']
+                tag_list.append(tag_dictionary)
+            return tag_list
 
-    creator = dict()
-    creator["Key"] = "Created by"
-    creator["Value"] = role_arn
+        except botocore.exceptions.ClientError as error:
+            print("Boto3 API returned error: ", error)
+            tag_list.clear()
+            return tag_list
 
-    role_tags.append(creator)
-    
-    
-    def set_resources_tags(resource_id, role_tags):
-
-        selected_resource_type = boto3.resource('ec2')
-        unit = 'instances'
-        resources_updated_tags = dict()
-        
-        print("Resource ID:", resource_id)
-
-        if unit == 'instances':
+    #Apply tags to resource
+    def set_resource_tags(resource_id, resource_tags):
+        # Is this an EC2 resource?
+        if re.search("^i-", resource_id):
             try:
-                resource_tag_list = []
-                instance = selected_resource_type.Instance(resource_id)
-                resource_tag_list = instance.create_tags(
-                    Tags=role_tags
+                client = boto3.client('ec2')
+                response = client.create_tags(
+                    Resources=[
+                        resource_id
+                    ],
+                    Tags=resource_tags
                 )
-                applied_tags = list()
-                for tag in resource_tag_list:
-                    tag_kv = dict()
-                    tag_kv["Key"] = tag.key
-                    tag_kv["Value"] = tag.value
-                    applied_tags.append(tag_kv)
-                resources_updated_tags[resource_id] = applied_tags
-            except:
-                resources_updated_tags["No Resources Found"] = "No Tags Applied"
-        return resources_updated_tags
+                response = client.describe_volumes(
+                    Filters=[
+                        {
+                            'Name': 'attachment.instance-id',
+                            'Values': [
+                                resource_id
+                            ]
+                        }
+                    ]
+                )
+                try:
+                    for volume in response['Volumes']:
+                        ec2 = boto3.resource('ec2')
+                        ec2_vol = ec2.Volume(volume['VolumeId'])
+                        vol_tags = ec2_vol.create_tags(
+                        Tags=resource_tags
+                        )
+                except botocore.exceptions.ClientError as error:
+                    print("Boto3 API returned error: ", error)
+                    print("No Tags Applied To: ", response['Volumes'])
+                    return False
+            except botocore.exceptions.ClientError as error:
+                print("Boto3 API returned error: ", error)
+                print("No Tags Applied To: ", resource_id)
+                return False
+            return True
+        else:
+            return False
 
-    resource_tags = dict()
-    resource_tags = set_resources_tags(resource_id, role_tags)
-    print("Resource ID & Tags: ", resource_tags)
-    return {
-        'statusCode': 200,
-        'body': json.dumps(resource_tags)
-    }
+    data_dict = get_unc_cw_event_data(event)
+    #data_dict = get_cw_event_data(event)
+    user_id_arn = data_dict['userIdentity']['arn']
+    user_id_components = user_id_arn.split("/")
+    user_id = user_id_components[-1]
+    role_arn = data_dict['userIdentity']['sessionContext']['sessionIssuer']['arn']
+    role_components = role_arn.split("/")
+    role_name = role_components[-1]
+    resource_date = data_dict['eventTime']
+    
+    resource_role_tags = list()
+    resource_role_tags = get_role_tags(role_name)
+
+    resource_parameter_tags = list()
+    resource_parameter_tags = get_ssm_parameter_tags(role_name, user_id)
+
+    resource_tags = list()
+    resource_tags = resource_role_tags + resource_parameter_tags
+
+    created_by = dict()
+    created_by['Key'] = 'Created by'
+    created_by['Value'] = user_id
+    resource_tags.append(created_by)
+
+    roleName = dict()
+    roleName['Key'] = 'Role Name'
+    roleName['Value'] = role_name
+    resource_tags.append(roleName)
+
+    date_created = dict()
+    date_created['Key'] = 'Date created'
+    date_created['Value'] = resource_date
+    resource_tags.append(date_created)
+    
+    if 'instancesSet' in data_dict['responseElements']:
+        for item in data_dict['responseElements']['instancesSet']['items']:
+            resource_id = item['instanceId']
+            if set_resource_tags(resource_id, resource_tags):    
+                return {
+                    'statusCode': 200,
+                    'Resource ID': resource_id,
+                    'body': json.dumps(resource_tags)
+                }
+            else:
+                return {
+                    'statusCode': 500,
+                    'No tags applied to Resource ID': resource_id,
+                    'Lambda function name': context.function_name,
+                    'Lambda function version': context.function_version
+                }
+    else:
+        return {
+            'statusCode': 200,
+            'No resources to tag': event['id']
+        }

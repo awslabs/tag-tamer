@@ -18,7 +18,6 @@ cp config/ssl-redirect.conf  /etc/nginx/default.d/
 cp config/tag-tamer.service /etc/systemd/system
 cp -pr code/* to /home/ec2-user/tag-tamer/
 
-mkdir -p /home/ec2-user/tag-tamer/log
 mkdir -p /var/log/tag-tamer
 mkdir -p /home/ec2-user/tag-tamer/downloads
 
@@ -26,10 +25,15 @@ mkdir -p /home/ec2-user/tag-tamer/downloads
 chown root:root /etc/nginx/conf.d/tag-tamer.conf /etc/nginx/proxy_params /etc/nginx/default.d/ssl-redirect.conf /etc/systemd/system/tag-tamer.service
 chown -R ec2-user:ec2-user /home/ec2-user/tag-tamer /var/log/tag-tamer
 
+# Initialize Tag Tamer log file
+touch /var/log/tag-tamer/tag-tamer.log
+chown -R ec2-user:ec2-user /var/log/tag-tamer/tag-tamer.log
+chmod 664 /var/log/tag-tamer/tag-tamer.log
+
 dos2unix /home/ec2-user/tag-tamer/*.py
 dos2unix /home/ec2-user/tag-tamer/templates/*.html
 
-# set server_tokens to off in nginx.conf file
+# Set server_tokens to off in nginx.conf file
 sed -i '/server_tokens/d' /etc/nginx/nginx.conf
 sed -i '/sendfile.*/i\    server_tokens       off;' /etc/nginx/nginx.conf
 

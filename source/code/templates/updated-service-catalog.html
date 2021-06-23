@@ -3,73 +3,112 @@
 SPDX-License-Identifier: MIT-0 -->
 
 <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>Your Updated Service Catalog</title>
-        <meta name="description" content="Format & display updated tags">
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
-    </head>
-    <body>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            <span>{{ message }}</span>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-              <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
-        <h3>Here are your selected AWS Service Catalog Products with updated TagOptions</h3>
-        <br>
-        <table style="width:800px" class="table table-bordered table-striped">
-            {% for product_template_id, tagoptions in updated_product_temp_tagoptions.items() %}
-            {% set product_template_name = sc_product_ids_names[product_template_id] %}
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Your Updated Service Catalog</title>
+    <meta name="description" content="Format & display updated tags" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css"
+      integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk"
+      crossorigin="anonymous"
+    />
+  </head>
+  <body>
+    {% with messages = get_flashed_messages(with_categories=true) %} {% if
+    messages %} {% for category, message in messages %}
+    <div
+      class="alert alert-{{ category }} alert-dismissible fade show"
+      role="alert"
+    >
+      <span>{{ message }}</span>
+      <button
+        type="button"
+        class="close"
+        data-dismiss="alert"
+        aria-label="Close"
+      >
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+    {% endfor %} {% endif %} {% endwith %}
+    <h3>
+      Here are your selected AWS Service Catalog Products with updated
+      TagOptions
+    </h3>
+    <br />
+    <table style="width: 800px" class="table table-bordered table-striped">
+      <caption>
+        This table displays updated AWS Service Catalog products with their
+        updated TagOptions
+      </caption>
+      {% for product_template_id, tagoptions in
+      updated_product_temp_tagoptions.items() %} {% set product_template_name =
+      sc_product_ids_names[product_template_id] %}
 
-                <tr>
-                        <thead>
-                        <th scope="col">Service Catalog Product Name</th>
-                        <th scope="col">Service Catalog TagOptions</th>
-                        </thead>
-                        <td>{{ product_template_name }}</td>
-                            <td><table style="width:600px" class="table table-sm table-bordered table-striped">
-                                 <thead>
-                                    <tr>
-                                    <th scope="col">TagOption Key</th>
-                                    <th scope="col">TagOption Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                {% for tagoption_group in tagoptions %}
-                                    {% for found_key, found_values in tagoption_group.items() %}
-                                            {% for found_value in found_values %}
-                                            <tr>
-                                                <td>{{ found_key }}</td><td>{{ found_value }}</td>
-                                            </tr>
-                                            {% endfor %}
-                                    {% endfor %}
-                                {% endfor %}
-                                </tbody>
-                                </table>
-                            </td>
-                </tr>
-                {% endfor %}
-        </table>
-    
-        <div class="container">
-            <form method="get" action="{{ url_for('actions') }}">
-                <button type="submit" class="btn btn-primary btn-lg">Home</button>
-            </form>
-        </div>    
-        <!-- Optional JavaScript -->
-        <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-        <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
-        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
-        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+      <tr>
+        <thead>
+          <th scope="col">Service Catalog Product Name</th>
+          <th scope="col">Service Catalog TagOptions</th>
+        </thead>
+        <td>{{ product_template_name }}</td>
+        <td>
+          <table
+            style="width: 600px"
+            class="table table-sm table-bordered table-striped"
+          >
+            <caption>
+              This table displays updated TagOptions keys & values for a
+              specific AWS Service Catalog product
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">TagOption Key</th>
+                <th scope="col">TagOption Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for tagoption_group in tagoptions %} {% for found_key,
+              found_values in tagoption_group.items() %} {% for found_value in
+              found_values %}
+              <tr>
+                <td>{{ found_key }}</td>
+                <td>{{ found_value }}</td>
+              </tr>
+              {% endfor %} {% endfor %} {% endfor %}
+            </tbody>
+          </table>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
 
-    </body>
+    <div class="container">
+      <form method="get" action="{{ url_for('actions') }}">
+        <button type="submit" class="btn btn-primary btn-lg">Home</button>
+      </form>
+    </div>
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script
+      src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+      integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+      integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"
+      integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI"
+      crossorigin="anonymous"
+    ></script>
+  </body>
 </html>

@@ -23,3 +23,34 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+*********************************
+ADDITIONAL THIRD PARTY COMPONENTS
+*********************************
+This software includes third party software subject to the following copyrights:
+
+aws-sdk under the Apache License Version 2.0
+Flask under the BSD License
+Flask-WTF under the BSD License
+Jinja2 under the BSD License
+MarkupSafe under the BSD License
+WTForms under the BSD License
+Werkzeug under the BSD License
+boto3 under the Apache Software License
+botocore under the Apache Software License
+certifi under the Mozilla Public License 2.0 (MPL 2.0)
+chardet under the GNU Library or Lesser General Public License (LGPL)
+click under the BSD License
+ecdsa under the MIT
+gunicorn under the MIT License
+idna under the BSD License
+itsdangerous under the BSD License
+jmespath under the MIT License
+pyasn1 under the BSD License
+python-dateutil under the BSD License, Apache Software License
+python-jose under the MIT License
+requests under the Apache Software License
+rsa under the Apache Software License
+s3transfer under the Apache Software License
+six under the MIT License
+urllib3 under the MIT License
