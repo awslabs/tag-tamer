@@ -12,7 +12,7 @@ Author: Bill Dry
 
 **a)** Identity the target AWS account where you would like to deploy Tag Tamer
 
-**b)** 3. If you are not using an Amazon EC2 AMI that includes the AWS SSM client, identify the EC2 Key Pair you will use to access the Tag Tamer Web App EC2 instance ("Web App")
+**b)** If you are not using an Amazon EC2 AMI that includes the AWS SSM client, identify the EC2 Key Pair you will use to access the Tag Tamer Web App EC2 instance ("Web App")
 
 **c)** Identify the IAM role within your target AWS account is prerequisite **a)** that AWS CloudFormation will use to deploy DynamoDB, EC2 & IAM resources into the target account to operate the Web App.
 
