@@ -10,6 +10,10 @@ Tag Tamer is a solution to manage, correct and enforce resource tagging on exist
 
 <img src="https://github.com/awslabs/tag-tamer/blob/release/v1.0.0/deployment/tag-tamer-arch.jpg" width="700" height="390">
 
+## Current branch
+
+[release/v.1.0.0](https://github.com/awslabs/tag-tamer/tree/release/v1.0.0)
+
 ## How to install the Tag Tamer solution
 
 Please refer to the Tag Tamer [implementation guide](https://docs.aws.amazon.com/solutions/latest/tag-tamer/welcome.html) for detailed solution installation instructions.
