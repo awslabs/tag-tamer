@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: (SO0132) AWS Cloudformation template for Tag Tamer solution components - (Version %%VERSION%% )
+Description: (SO0132) AWS CloudFormation template for Tag Tamer solution components - (Version v1.0.0 )
 Metadata: 
   AWS::CloudFormation::Interface: 
     ParameterGroups: 
@@ -209,7 +209,7 @@ Resources:
             #!/bin/bash -xe
             cd /var/tmp
             yum -y install git dos2unix
-            git clone https://github.com/billdry/tag-tamer.git
+            git clone --branch release/v1.0.0 https://github.com/awslabs/tag-tamer.git
             cd /var/tmp/tag-tamer/source/code
             dos2unix tag_tamer_parameters.json
             sed -i -e 's/"base_region": "us-east-1",/"base_region": "${AWS::Region}",/' tag_tamer_parameters.json

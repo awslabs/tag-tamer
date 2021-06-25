@@ -86,12 +86,14 @@ import sys
 from time import time
 
 # Read in Tag Tamer version
-tag_tamer_version_file = open("tag_tamer_version.json", "rt")
-tag_tamer_version = json.load(tag_tamer_version_file)
+tag_tamer_web_app_version_file = open("tag_tamer_web_app_version.json", "rt")
+tag_tamer_web_app_version = json.load(tag_tamer_web_app_version_file)
+tag_tamer_web_app_version_file.close()
 
 # Read in Tag Tamer solution parameters
 tag_tamer_parameters_file = open("tag_tamer_parameters.json", "rt")
 tag_tamer_parameters = json.load(tag_tamer_parameters_file)
+tag_tamer_parameters_file.close()
 
 # logLevel options are DEBUG, INFO, WARNING, ERROR or CRITICAL
 # Set logLevel specified in tag_tamer_parameters.json parameters file
@@ -315,7 +317,7 @@ def index():
         return render_template(
             "index.html",
             user_name=claims.get("username"),
-            version=tag_tamer_version.get("tag_tamer_version_number"),
+            version=tag_tamer_web_app_version.get("tag_tamer_web_app_version_number"),
         )
     else:
         log.info(
