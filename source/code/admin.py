@@ -1,38 +1,34 @@
-#!/usr/bin/env python3
+"""
+    Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+    SPDX-License-Identifier: MIT-0
 
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: MIT-0
-# Tag Tamer administrative functions
+    Tag Tamer administrative functions
+"""
 
-# Import AWS module for python
+import logging
+from time import gmtime, strftime, time
+
 import boto3
 from boto3.session import Session
 from botocore.exceptions import ClientError
 
-from time import time, gmtime, strftime
-
-# Import logging module
-import logging
-
-# Import the systems module to get interpreter data
-import sys
-
+# Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
-# Return the date & current time
+
 def date_time_now():
-    now = gmtime()
-    time_string = strftime("%d-%B-%Y at %H:%M:%S UTC", now)
+    """Returns the date & current time"""
+    time_string = strftime("%d-%B-%Y at %H:%M:%S UTC", gmtime())
     return time_string
 
 
-# Define execution_status class to return the execution status of Tag Tamer functions
-# alert_level variable aligns to getbootstrap_com/docs/4.5/components/alerts/
-class execution_status:
+class ExecutionStatus:
+    """Returns the execution status of Tag Tamer functions
+    alert_level variable aligns to getbootstrap_com/docs/4.5/components/alerts/
+    """
 
-    # Class constructor
     def __init__(self):
-        self.status = dict()
+        self.status = {}
 
     def success(self, **kwargs):
         if kwargs.get("message"):
@@ -63,10 +59,11 @@ class execution_status:
         return self.status
 
 
-# Create & return a Boto3 session object for an IAM role assumed in another AWS account
-# Inputs: IAM role ARN, user email, user name & user source IP address or source hostname all as keyword arguments
 def assume_role_multi_account(**kwargs):
-    my_status = execution_status()
+    """Create & return a Boto3 session object for an IAM role assumed in another AWS account
+    Inputs: IAM role ARN, user email, user name & user source IP address or source hostname all as keyword arguments
+    """
+    my_status = ExecutionStatus()
     this_session = boto3.session.Session(
         aws_access_key_id=kwargs["session_credentials"]["AccessKeyId"],
         aws_secret_access_key=kwargs["session_credentials"]["SecretKey"],
@@ -79,7 +76,7 @@ def assume_role_multi_account(**kwargs):
     else:
         log.error(
             'Failed to invoke "{}" on {}'.format(
-                sys._getframe().f_code.co_name, date_time_now()
+                assume_role_multi_account.__name__, date_time_now()
             )
         )
         my_status.error()
@@ -87,7 +84,6 @@ def assume_role_multi_account(**kwargs):
         return session_object
 
     try:
-        response = dict()
         response = sts_client.assume_role(
             RoleArn=kwargs.get("account_role_arn"), RoleSessionName=session_name
         )
@@ -100,7 +96,7 @@ def assume_role_multi_account(**kwargs):
             log.info(
                 '"{}" invoked "{}" on {} from location: "{}" using AWSAuth access key id: {} - SUCCESS'.format(
                     kwargs.get("user_email"),
-                    sys._getframe().f_code.co_name,
+                    assume_role_multi_account.__name__,
                     date_time_now(),
                     kwargs.get("user_source"),
                     response["Credentials"]["AccessKeyId"],
@@ -113,7 +109,7 @@ def assume_role_multi_account(**kwargs):
             log.error(
                 '"{}" invoked "{}" on {} from location: "{}" - FAILURE'.format(
                     kwargs.get("user_email"),
-                    sys._getframe().f_code.co_name,
+                    assume_role_multi_account.__name__,
                     date_time_now(),
                     kwargs.get("user_source"),
                 )
@@ -127,7 +123,7 @@ def assume_role_multi_account(**kwargs):
     except ClientError as error:
         log.error(
             "Boto3 API returned error. function: {} - {}".format(
-                sys._getframe().f_code.co_name, error
+                assume_role_multi_account.__name__, error
             )
         )
         my_status.error(
@@ -136,3 +132,22 @@ def assume_role_multi_account(**kwargs):
         session_object = False
 
     return session_object
+
+
+def get_boto3_client_session(
+    session_credentials=None, resource_type=None, region=None
+):
+    """Returns a Boto3 client & session based on supplied credentials"""
+    if session_credentials.get("multi_account_role_session"):
+        this_session = session_credentials.get("multi_account_role_session")
+        client = session_credentials["multi_account_role_session"].client(
+            resource_type, region_name=region
+        )
+    else:
+        this_session = boto3.session.Session(
+            aws_access_key_id=session_credentials.get("AccessKeyId"),
+            aws_secret_access_key=session_credentials.get("SecretKey"),
+            aws_session_token=session_credentials.get("SessionToken"),
+        )
+        client = this_session.client(resource_type, region_name=region)
+    return client, this_session

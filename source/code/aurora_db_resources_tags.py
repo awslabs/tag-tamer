@@ -6,370 +6,128 @@
 # Getters & Setters for Amazon Aurora DB cluster resource tags
 #  This class supports the main "resources_tags" class
 # Included class & methods
-# class - aurora_db_resources_tags
+# class - AuroraDbResourcesTags
 #  method - get_aurora_db_names_ids
 #  method - get_aurora_db_resources_tags
 #  method - get_aurora_db_tag_keys
 #  method - get_aurora_db_tag_values
 #  method - set_aurora_db_resources_tags
 
-# Import administrative functions
-from admin import execution_status
-
-# Import AWS module for python
-import boto3, botocore
-from botocore import exceptions
-
-# Import collections to use ordered dictionaries for storage
+import logging
+import re
 from collections import OrderedDict
 
-# Import logging module
-import logging
+import boto3
+import botocore
 
-# Import Python's regex module to filter Boto3's API responses
-import re
+from admin import ExecutionStatus, get_boto3_client_session
+from tag_utilities import tag_filter_matcher, get_tag_filter_key_value_states
 
 # Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
-# Define resources_tags class to get/set resources & their assigned tags
-class aurora_db_resources_tags:
+
+class AuroraDbResourcesTags:
+    """Define resources_tags class to get/set resources & their assigned tags"""
 
     # Class constructor
     def __init__(self, resource_type, region):
         self.resource_type = resource_type
         self.region = region
 
-    # Returns a filtered list of all resource names & ID's for the resource type specified
     def get_aurora_db_names_ids(self, filter_tags, **session_credentials):
-        my_status = execution_status()
-        self.filter_tags = filter_tags
-        tag_key1_state = True if self.filter_tags.get("tag_key1") else False
-        tag_value1_state = True if self.filter_tags.get("tag_value1") else False
-        tag_key2_state = True if self.filter_tags.get("tag_key2") else False
-        tag_value2_state = True if self.filter_tags.get("tag_value2") else False
-        if not self.filter_tags.get("conjunction"):
-            self.filter_tags["conjunction"] = "AND"
-        resource_inventory = dict()
+        """Returns a filtered list of all resource names & ID's for the resource type specified"""
+        my_status = ExecutionStatus()
+        (
+            tag_key1_state,
+            tag_value1_state,
+            tag_key2_state,
+            tag_value2_state,
+        ) = get_tag_filter_key_value_states(filter_tags=filter_tags)
+        if not filter_tags.get("conjunction"):
+            filter_tags["conjunction"] = "AND"
+        resource_inventory = {}
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
-
-        def _intersection_union_invalid(tag_dict, resource_name, resource_arn):
-            resource_inventory["No matching resource"] = "No matching resource"
-
-        if self.filter_tags.get("conjunction") == "AND":
-
-            def _intersection_tfff(tag_dict, resource_name, resource_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    resource_inventory[resource_arn] = resource_name
-
-            def _intersection_fftf(tag_dict, resource_name, resource_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    resource_inventory[resource_arn] = resource_name
-
-            def _intersection_fftt(tag_dict, resource_name, resource_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key2")
-                    ) == self.filter_tags.get("tag_value2"):
-                        resource_inventory[resource_arn] = resource_name
-
-            def _intersection_ttff(tag_dict, resource_name, resource_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key1")
-                    ) == self.filter_tags.get("tag_value1"):
-                        resource_inventory[resource_arn] = resource_name
-
-            def _intersection_tftf(tag_dict, resource_name, resource_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    resource_inventory[resource_arn] = resource_name
-
-            def _intersection_tftt(tag_dict, resource_name, resource_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key2")
-                    ) == self.filter_tags.get("tag_value2"):
-                        resource_inventory[resource_arn] = resource_name
-
-            def _intersection_tttf(tag_dict, resource_name, resource_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key1")
-                    ) == self.filter_tags.get("tag_value1"):
-                        resource_inventory[resource_arn] = resource_name
-
-            def _intersection_tttt(tag_dict, resource_name, resource_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key1")
-                    ) == self.filter_tags.get("tag_value1"):
-                        if tag_dict.get(
-                            self.filter_tags.get("tag_key2")
-                        ) == self.filter_tags.get("tag_value2"):
-                            resource_inventory[resource_arn] = resource_name
-
-            def _intersection_ffff(tag_dict, resource_name, resource_arn):
-                resource_inventory[resource_arn] = resource_name
-
-            # "AND" Truth table check for tag_key1, tag_value1, tag_key2, tag_value2
-            intersection_combos = {
-                (False, False, False, True): _intersection_union_invalid,
-                (False, True, False, False): _intersection_union_invalid,
-                (False, True, False, True): _intersection_union_invalid,
-                (True, False, False, True): _intersection_union_invalid,
-                (True, True, False, True): _intersection_union_invalid,
-                (False, True, True, False): _intersection_union_invalid,
-                (False, False, True, False): _intersection_fftf,
-                (False, False, True, True): _intersection_fftt,
-                (True, False, False, False): _intersection_tfff,
-                (True, True, False, False): _intersection_ttff,
-                (True, False, True, False): _intersection_tftf,
-                (True, False, True, True): _intersection_tftt,
-                (True, True, True, False): _intersection_tttf,
-                (True, True, True, True): _intersection_tttt,
-                (False, False, False, False): _intersection_ffff,
-            }
-
-            try:
-                # Get all the resources in the region
-                my_resources = client.describe_db_clusters()
-
+        try:
+            # Get all the resources in the region
+            my_resources = client.describe_db_clusters()
+            if my_resources.get("DBClusters"):
                 for item in my_resources["DBClusters"]:
-                    try:
-                        if item.get("TagList"):
-                            tag_dict = dict()
-                            for tag in item["TagList"]:
-                                tag_dict[tag["Key"]] = tag["Value"]
+                    if item.get("TagList"):
+                        tag_dict = {}
+                        for tag in item["TagList"]:
+                            tag_dict[tag["Key"]] = tag["Value"]
 
-                            intersection_combos[
-                                (
-                                    tag_key1_state,
-                                    tag_value1_state,
-                                    tag_key2_state,
-                                    tag_value2_state,
-                                )
-                            ](
-                                tag_dict,
-                                item["DBClusterIdentifier"],
-                                item["DBClusterArn"],
-                            )
-                        elif (
-                            self.filter_tags.get("tag_key1") == "<No tags applied>"
-                            or self.filter_tags.get("tag_key2") == "<No tags applied>"
-                        ):
-                            resource_inventory[item["DBClusterArn"]] = item[
-                                "DBClusterIdentifier"
-                            ]
+                        tag_filter_matcher(
+                            conjunction=filter_tags.get("conjunction"),
+                            tag_key1_state=tag_key1_state,
+                            tag_value1_state=tag_value1_state,
+                            tag_key2_state=tag_key2_state,
+                            tag_value2_state=tag_value2_state,
+                            resource_inventory=resource_inventory,
+                            filter_tags=filter_tags,
+                            tag_dict=tag_dict,
+                            resource_name=item["DBClusterIdentifier"],
+                            resource_arn=item["DBClusterArn"],
+                        )
 
-                    except botocore.exceptions.ClientError as error:
-                        log.error("Boto3 API returned error: {}".format(error))
-                        if (
-                            error.response["Error"]["Code"] == "AccessDeniedException"
-                            or error.response["Error"]["Code"]
-                            == "UnauthorizedOperation"
-                        ):
-                            my_status.error(
-                                message="You are not authorized to view these resources"
-                            )
-                        else:
-                            my_status.error()
+                    elif (
+                        filter_tags.get("tag_key1") == "<No tags applied>"
+                        or filter_tags.get("tag_key2") == "<No tags applied>"
+                    ):
+                        resource_inventory[item["DBClusterArn"]] = item[
+                            "DBClusterIdentifier"
+                        ]
+                    elif (
+                        not tag_key1_state
+                        and not tag_value1_state
+                        and not tag_key2_state
+                        and not tag_value2_state
+                    ):
+                        resource_inventory[item["DBClusterArn"]] = item[
+                            "DBClusterIdentifier"
+                        ]
                 my_status.success(message="Resources and tags found!")
-            except botocore.exceptions.ClientError as error:
-                log.error("Boto3 API returned error: {}".format(error))
-                if (
-                    error.response["Error"]["Code"] == "AccessDeniedException"
-                    or error.response["Error"]["Code"] == "UnauthorizedOperation"
-                ):
-                    my_status.error(
-                        message="You are not authorized to view these resources"
-                    )
-                else:
-                    my_status.error()
+            else:
+                my_status.warning(message="No resources and tags found!")
+        except botocore.exceptions.ClientError as error:
+            log.error("Boto3 API returned error: {}".format(error))
+            if (
+                error.response["Error"]["Code"] == "AccessDeniedException"
+                or error.response["Error"]["Code"] == "UnauthorizedOperation"
+            ):
+                my_status.error(
+                    message="You are not authorized to view these resources"
+                )
+            else:
+                my_status.error()
 
-        if self.filter_tags.get("conjunction") == "OR":
-
-            def _union_tfff_tftf_fftf(tag_dict, resource_name, resource_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    or self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    resource_inventory[resource_arn] = resource_name
-
-            def _union_tttf(tag_dict, resource_name, resource_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key1")
-                    ] == self.filter_tags.get("tag_value1"):
-                        resource_inventory[resource_arn] = resource_name
-                elif self.filter_tags.get("tag_key2") in tag_dict:
-                    resource_inventory[resource_arn] = resource_name
-
-            def _union_tftt(tag_dict, resource_name, resource_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key2")
-                    ] == self.filter_tags.get("tag_value2"):
-                        resource_inventory[resource_arn] = resource_name
-                elif self.filter_tags.get("tag_key1") in tag_dict:
-                    resource_inventory[resource_arn] = resource_name
-
-            def _union_fftt(tag_dict, resource_name, resource_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key2")
-                    ] == self.filter_tags.get("tag_value2"):
-                        resource_inventory[resource_arn] = resource_name
-
-            def _union_ttff(tag_dict, resource_name, resource_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key1")
-                    ] == self.filter_tags.get("tag_value1"):
-                        resource_inventory[resource_arn] = resource_name
-
-            def _union_tttt(tag_dict, resource_name, resource_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key1")
-                    ] == self.filter_tags.get("tag_value1"):
-                        resource_inventory[resource_arn] = resource_name
-                elif self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key2")
-                    ] == self.filter_tags.get("tag_value2"):
-                        resource_inventory[resource_arn] = resource_name
-
-            def _union_ffff(tag_dict, resource_name, resource_arn):
-                resource_inventory[resource_arn] = resource_name
-
-            # "OR" Truth table check for tag_key1, tag_value1, tag_key2, tag_value2
-            or_combos = {
-                (False, False, False, True): _intersection_union_invalid,
-                (False, True, False, False): _intersection_union_invalid,
-                (False, True, False, True): _intersection_union_invalid,
-                (False, True, True, True): _intersection_union_invalid,
-                (True, True, False, True): _intersection_union_invalid,
-                (False, False, True, False): _union_tfff_tftf_fftf,
-                (False, False, True, True): _union_fftt,
-                (True, False, False, False): _union_tfff_tftf_fftf,
-                (True, False, True, False): _union_tfff_tftf_fftf,
-                (True, False, True, True): _union_tftt,
-                (True, True, False, False): _union_ttff,
-                (True, True, True, False): _union_tttf,
-                (True, True, True, True): _union_tttt,
-                (False, False, False, False): _union_ffff,
-            }
-
-            try:
-                # Get all the resources in the region
-                my_resources = client.describe_db_clusters()
-                for item in my_resources["DBClusters"]:
-                    try:
-                        if item.get("TagList"):
-                            tag_dict = dict()
-                            for tag in item["TagList"]:
-                                tag_dict[tag["Key"]] = tag["Value"]
-
-                            or_combos[
-                                (
-                                    tag_key1_state,
-                                    tag_value1_state,
-                                    tag_key2_state,
-                                    tag_value2_state,
-                                )
-                            ](
-                                tag_dict,
-                                item["DBClusterIdentifier"],
-                                item["DBClusterArn"],
-                            )
-                        elif (
-                            self.filter_tags.get("tag_key1") == "<No tags applied>"
-                            or self.filter_tags.get("tag_key2") == "<No tags applied>"
-                        ):
-                            resource_inventory[item["DBClusterArn"]] = item[
-                                "DBClusterIdentifier"
-                            ]
-
-                    except botocore.exceptions.ClientError as error:
-                        log.error("Boto3 API returned error: {}".format(error))
-                        if (
-                            error.response["Error"]["Code"] == "AccessDeniedException"
-                            or error.response["Error"]["Code"]
-                            == "UnauthorizedOperation"
-                        ):
-                            my_status.error(
-                                message="You are not authorized to view these resources"
-                            )
-                        else:
-                            my_status.error()
-                my_status.success(message="Resources and tags found!")
-            except botocore.exceptions.ClientError as error:
-                log.error("Boto3 API returned error: {}".format(error))
-                if (
-                    error.response["Error"]["Code"] == "AccessDeniedException"
-                    or error.response["Error"]["Code"] == "UnauthorizedOperation"
-                ):
-                    my_status.error(
-                        message="You are not authorized to view these resources"
-                    )
-                else:
-                    my_status.error()
         return resource_inventory, my_status.get_status()
 
     # method - get_aurora_db_resources_tags
     # Returns a nested dictionary of every resource & its key:value tags for the chosen resource type
     # List of chosen resources from get_aurora_db_names_ids() & session credentials are arguments
     def get_aurora_db_resources_tags(self, chosen_resources, **session_credentials):
-        my_status = execution_status()
+        my_status = ExecutionStatus()
         # Instantiate dictionaries to hold resources & their tags
-        tagged_resource_inventory = dict()
+        tagged_resource_inventory = {}
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         try:
-            if chosen_resources[0][0] != "No matching resources found":
+            if chosen_resources:
                 for resource_id_name in chosen_resources:
-                    resource_tags = dict()
-                    sorted_resource_tags = dict()
+                    resource_tags = {}
                     resource_arn = resource_id_name[0]
                     try:
                         # Get all the tags for a given resource
@@ -434,25 +192,16 @@ class aurora_db_resources_tags:
     # Getter method retrieves every tag:key for object's resource type
     # session credentials as the only input arguments
     def get_aurora_db_tag_keys(self, **session_credentials):
-        my_status = execution_status()
-        tag_keys_inventory = list()
+        my_status = ExecutionStatus()
+        tag_keys_inventory = []
         # Give users ability to find resources with no tags applied
         tag_keys_inventory.append("<No tags applied>")
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         try:
             # Interate all the resources in the region
@@ -496,23 +245,14 @@ class aurora_db_resources_tags:
     # Getter method retrieves every tag:value for object's resource type
     # session credentials as the only input arguments
     def get_aurora_db_tag_values(self, **session_credentials):
-        my_status = execution_status()
-        tag_values_inventory = list()
+        my_status = ExecutionStatus()
+        tag_values_inventory = []
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         try:
             # Interate all the resources in the region
@@ -561,32 +301,25 @@ class aurora_db_resources_tags:
     def set_aurora_db_resources_tags(
         self, resources_to_tag, chosen_tags, **session_credentials
     ):
-        my_status = execution_status()
-        resources_updated_tags = dict()
+        my_status = ExecutionStatus()
+        resources_updated_tags = {}
 
         self.resources_to_tag = resources_to_tag
         self.chosen_tags = chosen_tags
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         for resource_arn in self.resources_to_tag:
             try:
                 response = client.add_tags_to_resource(
                     ResourceName=resource_arn, Tags=self.chosen_tags
                 )
-                my_status.success(message="RDS Aurora DB Cluster tags updated successfully!")
+                my_status.success(
+                    message="RDS Aurora DB Cluster tags updated successfully!"
+                )
             except botocore.exceptions.ClientError as error:
                 log.error("Boto3 API returned error: {}".format(error))
                 resources_updated_tags["No Resources Found"] = "No Tags Applied"

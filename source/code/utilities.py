@@ -4,29 +4,23 @@
 # SPDX-License-Identifier: MIT-0
 # Tag Tamer utility functions
 
-# Import AWS modules for python
+import json
+import logging
+import time
+import urllib.request
+
 import boto3
 import boto3.session
 import botocore
-from botocore import exceptions
-from botocore.exceptions import ClientError
-
-import json
-import time
-import urllib.request
 from jose import jwk, jwt
 from jose.utils import base64url_decode
 
-# Import logging module
-import logging
-
-# Import the systems module to get interpreter data
-import sys
-
+# Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
-# Returns a list of all AWS regions
+
 def get_aws_regions():
+    """Returns a list of all current AWS regions"""
     my_session = boto3.session.Session(region_name="us-east-1")
     try:
         available_regions = my_session.get_available_regions(
@@ -35,15 +29,15 @@ def get_aws_regions():
     except botocore.exceptions.ClientError as error:
         log.error(
             "Boto3 API returned error. function: {} - {}".format(
-                sys._getframe().f_code.co_name, error
+                get_aws_regions.__name__, error
             )
         )
         available_regions = False
     return available_regions
 
 
-# Return the Boto3 resource type & unit to the caller
 def get_resource_type_unit(type):
+    """Returns the Boto3 resource type & unit to the caller"""
     if type:
         if type == "codecommit":
             resource_type = "codecommit"
@@ -88,8 +82,8 @@ def get_resource_type_unit(type):
         return resource_type, unit
 
 
-# Decode & verify JWT claims
 def verify_jwt(region, user_pool_id, app_client_id, token_type, token):
+    """Decode & verify JWT claims"""
     this_region = region
     this_user_pool_id = user_pool_id
     this_token_type = token_type

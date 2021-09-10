@@ -4,31 +4,25 @@
 # SPDX-License-Identifier: MIT-0
 # Getter & setter for AWS IAM
 
-# Import administrative functions
-from admin import execution_status
-
-# Import AWS modules for python
-import botocore
-from botocore import exceptions
-import boto3
-from boto3.dynamodb.conditions import Key, Attr
-
-# Import logging module
 import logging
 
-# Import sys to return name of current function
-import sys
+import boto3
+import botocore
 
+from admin import ExecutionStatus
+
+# Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
+
 # Define AWS Config class to get/set IAM Roles using Boto3
-class roles:
+class Roles:
 
     # Class constructor
     def __init__(self, region, **session_credentials):
-        self.my_status = execution_status()
+        self.my_status = ExecutionStatus()
         self.region = region
-        self.session_credentials = dict()
+        self.session_credentials = {}
         self.session_credentials["AccessKeyId"] = session_credentials["AccessKeyId"]
         self.session_credentials["SecretKey"] = session_credentials["SecretKey"]
         self.session_credentials["SessionToken"] = session_credentials["SessionToken"]
@@ -55,7 +49,7 @@ class roles:
 
     # Return the list of IAM Roles for the specified path prefix
     def get_roles(self, path_prefix):
-        roles_inventory = list()
+        roles_inventory = []
         try:
             raw_roles_inventory = self.iam_resource.roles.filter(PathPrefix=path_prefix)
             for raw_role in raw_roles_inventory:
@@ -66,7 +60,7 @@ class roles:
         except botocore.exceptions.ClientError as error:
             log.error(
                 "Boto3 API returned error. function: {} - {}".format(
-                    sys._getframe().f_code.co_name, error
+                    Roles.get_roles.__name__, error
                 )
             )
             if (
@@ -84,9 +78,8 @@ class roles:
 
     # Get assigned tags for a specified role
     def get_role_tags(self, role_arn):
-        tags = list()
+        tags = []
         try:
-            response = dict()
             response = self.table.get_item(
                 Key={"role_arn": role_arn}, ProjectionExpression="tags"
             )
@@ -95,7 +88,7 @@ class roles:
         except botocore.exceptions.ClientError as error:
             log.error(
                 "Boto3 API returned error. function: {} - {}".format(
-                    sys._getframe().f_code.co_name, error
+                    Roles.get_role_tags.__name__, error
                 )
             )
             if (
@@ -126,7 +119,7 @@ class roles:
         except botocore.exceptions.ClientError as error:
             log.error(
                 "Boto3 API returned error. function: {} - {}".format(
-                    sys._getframe().f_code.co_name, error
+                    Roles.set_role_tags.__name__, error
                 )
             )
             if (

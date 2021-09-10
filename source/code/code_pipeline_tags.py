@@ -6,394 +6,144 @@
 # Getters & Setters for AWS CodePipeline resource tags
 #  This class supports the main "resources_tags" class
 # Included class & methods
-# class - code_pipeline_tags
+# class - CodePipelineTags
 #  method - get_code_pipeline_ids
 #  method - get_pipeline_resources_tags
 #  method - get_pipeline_tag_keys
 #  method - get_pipeline_tag_values
 #  method - set_pipeline_resources_tags
 
-# Import administrative functions
-from admin import execution_status
-
-# Import AWS module for python
-import boto3, botocore
-from botocore import exceptions
-
-# Import collections to use ordered dictionaries for storage
+import logging
+import re
 from collections import OrderedDict
 
-# Import logging module
-import logging
+import boto3
+import botocore
 
-# Import Python's regex module to filter Boto3's API responses
-import re
+from admin import ExecutionStatus, get_boto3_client_session
+from tag_utilities import tag_filter_matcher, get_tag_filter_key_value_states
 
 # Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
-# Define resources_tags class to get/set resources & their assigned tags
-class code_pipeline_tags:
+
+class CodePipelineTags:
+    """Define resources_tags class to get/set resources & their assigned tags"""
 
     # Class constructor
     def __init__(self, resource_type, region):
         self.resource_type = resource_type
         self.region = region
 
-    # Returns a filtered list of all resource names & ID's for the resource type specified
     def get_code_pipeline_ids(self, filter_tags, **session_credentials):
-        my_status = execution_status()
-        self.filter_tags = filter_tags
-        tag_key1_state = True if self.filter_tags.get("tag_key1") else False
-        tag_value1_state = True if self.filter_tags.get("tag_value1") else False
-        tag_key2_state = True if self.filter_tags.get("tag_key2") else False
-        tag_value2_state = True if self.filter_tags.get("tag_value2") else False
-        if not self.filter_tags.get("conjunction"):
-            self.filter_tags["conjunction"] = "AND"
-        resource_inventory = dict()
+        """Returns a filtered list of all resource names & ID's for the resource type specified"""
+        my_status = ExecutionStatus()
+        (
+            tag_key1_state,
+            tag_value1_state,
+            tag_key2_state,
+            tag_value2_state,
+        ) = get_tag_filter_key_value_states(filter_tags=filter_tags)
+        if not filter_tags.get("conjunction"):
+            filter_tags["conjunction"] = "AND"
+        resource_inventory = {}
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
-
-        def _intersection_union_invalid(tag_dict, pipeline_name, pipeline_arn):
-            resource_inventory["No matching resource"] = "No matching resource"
-
-        if self.filter_tags.get("conjunction") == "AND":
-
-            def _intersection_tfff(tag_dict, pipeline_name, pipeline_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    resource_inventory[pipeline_arn] = pipeline_name
-
-            def _intersection_fftf(tag_dict, pipeline_name, pipeline_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    resource_inventory[pipeline_arn] = pipeline_name
-
-            def _intersection_fftt(tag_dict, pipeline_name, pipeline_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key2")
-                    ) == self.filter_tags.get("tag_value2"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-
-            def _intersection_ttff(tag_dict, pipeline_name, pipeline_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key1")
-                    ) == self.filter_tags.get("tag_value1"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-
-            def _intersection_tftf(tag_dict, pipeline_name, pipeline_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    resource_inventory[pipeline_arn] = pipeline_name
-
-            def _intersection_tftt(tag_dict, pipeline_name, pipeline_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key2")
-                    ) == self.filter_tags.get("tag_value2"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-
-            def _intersection_tttf(tag_dict, pipeline_name, pipeline_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key1")
-                    ) == self.filter_tags.get("tag_value1"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-
-            def _intersection_tttt(tag_dict, pipeline_name, pipeline_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key1")
-                    ) == self.filter_tags.get("tag_value1"):
-                        if tag_dict.get(
-                            self.filter_tags.get("tag_key2")
-                        ) == self.filter_tags.get("tag_value2"):
-                            resource_inventory[pipeline_arn] = pipeline_name
-
-            def _intersection_ffff(tag_dict, pipeline_name, pipeline_arn):
-                resource_inventory[pipeline_arn] = pipeline_name
-
-            # "AND" Truth table check for tag_key1, tag_value1, tag_key2, tag_value2
-            intersection_combos = {
-                (False, False, False, True): _intersection_union_invalid,
-                (False, True, False, False): _intersection_union_invalid,
-                (False, True, False, True): _intersection_union_invalid,
-                (True, False, False, True): _intersection_union_invalid,
-                (True, True, False, True): _intersection_union_invalid,
-                (False, True, True, False): _intersection_union_invalid,
-                (False, False, True, False): _intersection_fftf,
-                (False, False, True, True): _intersection_fftt,
-                (True, False, False, False): _intersection_tfff,
-                (True, True, False, False): _intersection_ttff,
-                (True, False, True, False): _intersection_tftf,
-                (True, False, True, True): _intersection_tftt,
-                (True, True, True, False): _intersection_tttf,
-                (True, True, True, True): _intersection_tttt,
-                (False, False, False, False): _intersection_ffff,
-            }
-
-            try:
-                # Get all the CodePipelines in the region
-                my_pipelines = client.list_pipelines()
-                if len(my_pipelines.get("pipelines")):
-                    for item in my_pipelines["pipelines"]:
-                        try:
-                            code_pipeline_arn = client.get_pipeline(name=item["name"])[
-                                "metadata"
-                            ]["pipelineArn"]
-                            # Get all the tags for a given CodePipeline
-                            response = client.list_tags_for_resource(
-                                resourceArn=code_pipeline_arn
+        try:
+            # Get all the CodePipelines in the region
+            my_pipelines = client.list_pipelines()
+            if len(my_pipelines.get("pipelines")):
+                for item in my_pipelines["pipelines"]:
+                    try:
+                        code_pipeline_arn = client.get_pipeline(name=item["name"])[
+                            "metadata"
+                        ]["pipelineArn"]
+                        # Get all the tags for a given CodePipeline
+                        response = client.list_tags_for_resource(
+                            resourceArn=code_pipeline_arn
+                        )
+                        if (
+                            filter_tags.get("tag_key1") == "<No tags applied>"
+                            or filter_tags.get("tag_key2") == "<No tags applied>"
+                        ) and not response.get("tags"):
+                            resource_inventory[code_pipeline_arn] = item["name"]
+                        elif response.get("tags"):
+                            tag_dict = {}
+                            for tag in response.get("tags"):
+                                tag_dict[tag["key"]] = tag["value"]
+                            tag_filter_matcher(
+                                conjunction=filter_tags.get("conjunction"),
+                                tag_key1_state=tag_key1_state,
+                                tag_value1_state=tag_value1_state,
+                                tag_key2_state=tag_key2_state,
+                                tag_value2_state=tag_value2_state,
+                                resource_inventory=resource_inventory,
+                                filter_tags=filter_tags,
+                                tag_dict=tag_dict,
+                                resource_name=item["name"],
+                                resource_arn=code_pipeline_arn,
                             )
+                        elif (
+                            not tag_key1_state
+                            and not tag_value1_state
+                            and not tag_key2_state
+                            and not tag_value2_state
+                        ):
+                            resource_inventory[code_pipeline_arn] = item["name"]
 
-                            if "tags" in response.keys():
-                                if (
-                                    self.filter_tags.get("tag_key1")
-                                    == "<No tags applied>"
-                                    or self.filter_tags.get("tag_key2")
-                                    == "<No tags applied>"
-                                ) and not len(response.get("tags")):
-                                    resource_inventory[code_pipeline_arn] = item["name"]
-                                else:
-                                    tag_dict = dict()
-                                    for tag in response.get("tags"):
-                                        tag_dict[tag["key"]] = tag["value"]
-                                    intersection_combos[
-                                        (
-                                            tag_key1_state,
-                                            tag_value1_state,
-                                            tag_key2_state,
-                                            tag_value2_state,
-                                        )
-                                    ](
-                                        tag_dict,
-                                        item["name"],
-                                        code_pipeline_arn,
-                                    )
-
-                        except botocore.exceptions.ClientError as error:
-                            log.error("Boto3 API returned error: {}".format(error))
-                            if (
-                                error.response["Error"]["Code"]
-                                == "AccessDeniedException"
-                                or error.response["Error"]["Code"]
-                                == "UnauthorizedOperation"
-                            ):
-                                my_status.error(
-                                    message="You are not authorized to view these resources"
-                                )
-                            else:
-                                my_status.error()
-                    my_status.success(message="Resources and tags found!")
-                # If no resources found
-                else:
-                    my_status.warning(message="No resources and tags found!")
-            except botocore.exceptions.ClientError as error:
-                log.error("Boto3 API returned error: {}".format(error))
-                if (
-                    error.response["Error"]["Code"] == "AccessDeniedException"
-                    or error.response["Error"]["Code"] == "UnauthorizedOperation"
-                ):
-                    my_status.error(
-                        message="You are not authorized to view these resources"
-                    )
-                else:
-                    my_status.error()
-
-        if self.filter_tags.get("conjunction") == "OR":
-
-            def _union_tfff_tftf_fftf(tag_dict, pipeline_name, pipeline_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    or self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    resource_inventory[pipeline_arn] = pipeline_name
-
-            def _union_tttf(tag_dict, pipeline_name, pipeline_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key1")
-                    ] == self.filter_tags.get("tag_value1"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-                elif self.filter_tags.get("tag_key2") in tag_dict:
-                    resource_inventory[pipeline_arn] = pipeline_name
-
-            def _union_tftt(tag_dict, pipeline_name, pipeline_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key2")
-                    ] == self.filter_tags.get("tag_value2"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-                elif self.filter_tags.get("tag_key1") in tag_dict:
-                    resource_inventory[pipeline_arn] = pipeline_name
-
-            def _union_fftt(tag_dict, pipeline_name, pipeline_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key2")
-                    ] == self.filter_tags.get("tag_value2"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-
-            def _union_ttff(tag_dict, pipeline_name, pipeline_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key1")
-                    ] == self.filter_tags.get("tag_value1"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-
-            def _union_tttt(tag_dict, pipeline_name, pipeline_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key1")
-                    ] == self.filter_tags.get("tag_value1"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-                elif self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key2")
-                    ] == self.filter_tags.get("tag_value2"):
-                        resource_inventory[pipeline_arn] = pipeline_name
-
-            def _union_ffff(tag_dict, pipeline_name, pipeline_arn):
-                resource_inventory[pipeline_arn] = pipeline_name
-
-            # "OR" Truth table check for tag_key1, tag_value1, tag_key2, tag_value2
-            or_combos = {
-                (False, False, False, True): _intersection_union_invalid,
-                (False, True, False, False): _intersection_union_invalid,
-                (False, True, False, True): _intersection_union_invalid,
-                (False, True, True, True): _intersection_union_invalid,
-                (True, True, False, True): _intersection_union_invalid,
-                (False, False, True, False): _union_tfff_tftf_fftf,
-                (False, False, True, True): _union_fftt,
-                (True, False, False, False): _union_tfff_tftf_fftf,
-                (True, False, True, False): _union_tfff_tftf_fftf,
-                (True, False, True, True): _union_tftt,
-                (True, True, False, False): _union_ttff,
-                (True, True, True, False): _union_tttf,
-                (True, True, True, True): _union_tttt,
-                (False, False, False, False): _union_ffff,
-            }
-
-            try:
-                # Get all the CodePipelines in the region
-                my_pipelines = client.list_pipelines()
-                if len(my_pipelines.get("pipelines")):
-                    for item in my_pipelines["pipelines"]:
-                        try:
-                            code_pipeline_arn = client.get_pipeline(name=item["name"])[
-                                "metadata"
-                            ]["pipelineArn"]
-                            # Get all the tags for a given CodePipeline
-                            response = client.list_tags_for_resource(
-                                resourceArn=code_pipeline_arn
+                    except botocore.exceptions.ClientError as error:
+                        log.error("Boto3 API returned error: {}".format(error))
+                        if (
+                            error.response["Error"]["Code"] == "AccessDeniedException"
+                            or error.response["Error"]["Code"]
+                            == "UnauthorizedOperation"
+                        ):
+                            my_status.error(
+                                message="You are not authorized to view these resources"
                             )
+                        else:
+                            my_status.error()
+                my_status.success(message="Resources and tags found!")
+            # If no CodePipeline resources found
+            else:
+                my_status.warning(message="No resources and tags found!")
+        except botocore.exceptions.ClientError as error:
+            log.error("Boto3 API returned error: {}".format(error))
+            if (
+                error.response["Error"]["Code"] == "AccessDeniedException"
+                or error.response["Error"]["Code"] == "UnauthorizedOperation"
+            ):
+                my_status.error(
+                    message="You are not authorized to view these resources"
+                )
+            else:
+                my_status.error()
 
-                            if "tags" in response.keys():
-                                if (
-                                    self.filter_tags.get("tag_key1")
-                                    == "<No tags applied>"
-                                    or self.filter_tags.get("tag_key2")
-                                    == "<No tags applied>"
-                                ) and not len(response.get("tags")):
-                                    resource_inventory[code_pipeline_arn] = item["name"]
-                                else:
-                                    tag_dict = dict()
-                                    for tag in response.get("tags"):
-                                        tag_dict[tag["key"]] = tag["value"]
-                                    or_combos[
-                                        (
-                                            tag_key1_state,
-                                            tag_value1_state,
-                                            tag_key2_state,
-                                            tag_value2_state,
-                                        )
-                                    ](
-                                        tag_dict,
-                                        item["name"],
-                                        code_pipeline_arn,
-                                    )
-
-                        except botocore.exceptions.ClientError as error:
-                            log.error("Boto3 API returned error: {}".format(error))
-                            if (
-                                error.response["Error"]["Code"]
-                                == "AccessDeniedException"
-                                or error.response["Error"]["Code"]
-                                == "UnauthorizedOperation"
-                            ):
-                                my_status.error(
-                                    message="You are not authorized to view these resources"
-                                )
-                            else:
-                                my_status.error()
-                    my_status.success(message="Resources and tags found!")
-                else:
-                    my_status.warning(message="No resources and tags found!")
-            except botocore.exceptions.ClientError as error:
-                log.error("Boto3 API returned error: {}".format(error))
-                if (
-                    error.response["Error"]["Code"] == "AccessDeniedException"
-                    or error.response["Error"]["Code"] == "UnauthorizedOperation"
-                ):
-                    my_status.error(
-                        message="You are not authorized to view these resources"
-                    )
-                else:
-                    my_status.error()
         return resource_inventory, my_status.get_status()
 
     # method - get_pipeline_resources_tags
     # Returns a nested dictionary of every resource & its key:value tags for the chosen resource type
     # input arguments - list of lists resource ID & resource name pairs and Boto3 session credentials as argv dictionary
     def get_pipeline_resources_tags(self, chosen_resources, **session_credentials):
-        my_status = execution_status()
+        my_status = ExecutionStatus()
         # Instantiate dictionaries to hold resources & their tags
-        tagged_resource_inventory = dict()
+        tagged_resource_inventory = {}
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         try:
-            if chosen_resources[0][0] != "No matching resources found":
+            if chosen_resources:
                 for resource_id_name in chosen_resources:
-                    resource_tags = dict()
-                    sorted_resource_tags = dict()
+                    resource_tags = {}
                     pipeline_arn = resource_id_name[0]
                     try:
                         # Get all the tags for a given CodePipeline
@@ -401,7 +151,6 @@ class code_pipeline_tags:
                             resourceArn=pipeline_arn
                         )
                         if len(response.get("tags")):
-                            # for tag_key, tag_value in response["tags"].items():
                             for tag_pair in response["tags"]:
                                 if not re.search("^aws:", tag_pair["key"]):
                                     resource_tags[tag_pair["key"]] = tag_pair["value"]
@@ -451,25 +200,16 @@ class code_pipeline_tags:
     # Getter method retrieves every tag:key for object's resource type
     # No input arguments
     def get_pipeline_tag_keys(self, **session_credentials):
-        my_status = execution_status()
-        tag_keys_inventory = list()
+        my_status = ExecutionStatus()
+        tag_keys_inventory = []
         # Give users ability to find resources with no tags applied
         tag_keys_inventory.append("<No tags applied>")
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         try:
             # Get all the CodePipelines in the region
@@ -490,14 +230,12 @@ class code_pipeline_tags:
                                 if not re.search("^aws:", tag["key"]):
                                     tag_keys_inventory.append(tag["key"])
                             my_status.success(message="Resources and tags found!")
-                        except:
-                            # tag_keys_inventory.append("No tag keys found")
+                        except Exception:
                             my_status.error(
                                 message="You are not authorized to view these resources"
                             )
                     except botocore.exceptions.ClientError as error:
                         log.error("Boto3 API returned error: {}".format(error))
-                        # tag_keys_inventory.append("No tag keys found")
                         if (
                             error.response["Error"]["Code"] == "AccessDeniedException"
                             or error.response["Error"]["Code"]
@@ -535,23 +273,14 @@ class code_pipeline_tags:
     # Getter method retrieves every tag:value for object's resource type
     # No input arguments
     def get_pipeline_tag_values(self, **session_credentials):
-        my_status = execution_status()
-        tag_values_inventory = list()
+        my_status = ExecutionStatus()
+        tag_values_inventory = []
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         try:
             # Get all the CodePipelines in the region
@@ -570,9 +299,11 @@ class code_pipeline_tags:
                             # Add all tag values to the list
                             for tag in response["tags"]:
                                 # Exclude any AWS-applied tags which begin with "aws:"
-                                if not re.search("^aws:", tag["key"]) and tag.get("value"):
+                                if not re.search("^aws:", tag["key"]) and tag.get(
+                                    "value"
+                                ):
                                     tag_values_inventory.append(tag["value"])
-                        except:
+                        except Exception:
                             # tag_values_inventory.append("No tag values found")
                             my_status.warning(
                                 message="No tags found for this resource."
@@ -621,23 +352,14 @@ class code_pipeline_tags:
     def set_pipeline_resources_tags(
         self, resources_to_tag, chosen_tags, **session_credentials
     ):
-        my_status = execution_status()
-        resources_updated_tags = dict()
+        my_status = ExecutionStatus()
+        resources_updated_tags = {}
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         # for CodePipeline Boto3 API convert list of tags dicts to single key:value tag dict
         for tag in chosen_tags:

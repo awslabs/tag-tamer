@@ -10,13 +10,25 @@ mkdir -p /home/ec2-user/tag-tamer/prod
 chown -R ec2-user:ec2-user /home/ec2-user/tag-tamer
 su - ec2-user -c "python3 -m venv /home/ec2-user/tag-tamer/prod;source /home/ec2-user/tag-tamer/prod/bin/activate; pip3 install boto3 botocore flask flask-WTF gunicorn python-jose /var/tmp/tag-tamer/source/Flask-AWSCognito; deactivate"
 
+# Update with EC2 private IP address for AWS CloudFormation "Private" template deployments
+cd /var/tmp/tag-tamer/source/code/templates || exit
+sed -i 's/TAG_TAMER_EC2_INSTANCE_IP_DNS/$(hostname -i)/g' *.html
+
 # Copy code and config
-cd /var/tmp/tag-tamer/source
+cd /var/tmp/tag-tamer/source || exit
 cp config/tag-tamer.conf /etc/nginx/conf.d
 cp config/proxy_params /etc/nginx
 cp config/ssl-redirect.conf  /etc/nginx/default.d/
 cp config/tag-tamer.service /etc/systemd/system
-cp -pr code/* to /home/ec2-user/tag-tamer/
+cp -pr code/* /home/ec2-user/tag-tamer/
+
+# Install Tag Tamer web app UI static files -- css & js
+mkdir -p /usr/share/nginx/css
+cp css/* /usr/share/nginx/css
+dos2unix /usr/share/nginx/css/*.css
+mkdir -p /usr/share/nginx/js
+cp js/* /usr/share/nginx/js
+dos2unix /usr/share/nginx/js/*.js
 
 mkdir -p /var/log/tag-tamer
 mkdir -p /home/ec2-user/tag-tamer/downloads
@@ -40,17 +52,17 @@ sed -i '/sendfile.*/i\    server_tokens       off;' /etc/nginx/nginx.conf
 # SSL certificate creation - START
 
 # Fix IP in config
-sed -i  "s/10.0.5.59/`hostname -i`/g" /etc/nginx/conf.d/tag-tamer.conf 
+sed -i  "s/10.0.5.59/$(hostname -i)/g" /etc/nginx/conf.d/tag-tamer.conf
 
 # Get Public or Private Hostnames/IPs to configure in certificate
-FQDN1=`curl http://169.254.169.254/latest/meta-data/local-hostname` 
-FQDN2=`curl http://169.254.169.254/latest/meta-data/public-hostname` 
-IP1=`curl http://169.254.169.254/latest/meta-data/local-ipv4`
-IP2=`curl http://169.254.169.254/latest/meta-data/public-ipv4`
+FQDN1=$(curl http://169.254.169.254/latest/meta-data/local-hostname)
+FQDN2=$(curl http://169.254.169.254/latest/meta-data/public-hostname)
+IP1=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
+IP2=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
 
 # Create root CA 
 mkdir -p /etc/pki/nginx/
-cd /etc/pki/nginx/
+cd /etc/pki/nginx/ || exit
 openssl genrsa -out rootCA.key 2048
 openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 398 -out rootCA.crt -subj "/C=US/ST=NC/L=Raleigh/O=AWS/OU=AWS Support/CN=amazonaws.com"
 

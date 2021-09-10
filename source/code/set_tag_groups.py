@@ -4,29 +4,25 @@
 # SPDX-License-Identifier: MIT-0
 # Setter updating tag groups in DynamoDB
 
-# Import administrative functions
-from admin import execution_status
-
-# Import AWS module for python
-import botocore
-from botocore import exceptions
-import boto3
-from boto3.dynamodb.conditions import Key, Attr
-
-# Import logging module
 import logging
 
+import boto3
+import botocore
+
+from admin import ExecutionStatus
+
+# Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
+
 # This class instantiates & updates Tag Tamer Tag Groups
-class set_tag_group:
+class SetTagGroup:
 
     # Class constructor
     def __init__(self, region, **session_credentials):
-        self.my_status = execution_status()
+        self.my_status = ExecutionStatus()
         self.region = region
-        self.tag_groups = dict()
-        self.session_credentials = dict()
+        self.session_credentials = {}
         self.session_credentials["AccessKeyId"] = session_credentials["AccessKeyId"]
         self.session_credentials["SecretKey"] = session_credentials["SecretKey"]
         self.session_credentials["SessionToken"] = session_credentials["SessionToken"]

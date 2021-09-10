@@ -5,41 +5,28 @@
 # Getter & setter for AWS Service Catalog (SC) items.
 # A Tag Group equals a group of SC TagOptions that all have the same Tag Key
 
-# Import administrative functions
-from admin import execution_status
-
-# Import AWS module for python
-import boto3
-import botocore
-from botocore import exceptions
-
-# Import Collections module to manipulate dictionaries
-import collections
+import logging
+import re
 from collections import defaultdict
 
-# Import getter for TagOption Groups
-import get_tag_groups
-from get_tag_groups import get_tag_groups
+import boto3
+import botocore
 
-# Import JSON parser
-import json
+from admin import ExecutionStatus
+from get_tag_groups import GetTagGroups
 
-# Import logging module
-import logging
-
-# Import Python's regex module to filter Boto3's API responses
-import re
-
+# Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
+
 # Define Service Catalog (SC) class to get/set items using Boto3
-class service_catalog:
+class ServiceCatalog:
 
     # Class constructor
     def __init__(self, region, **session_credentials):
-        self.my_status = execution_status()
+        self.my_status = ExecutionStatus()
         self.region = region
-        self.session_credentials = dict()
+        self.session_credentials = {}
         self.session_credentials["AccessKeyId"] = session_credentials["AccessKeyId"]
         self.session_credentials["SecretKey"] = session_credentials["SecretKey"]
         self.session_credentials["SessionToken"] = session_credentials["SessionToken"]
@@ -66,7 +53,7 @@ class service_catalog:
 
     # Method to create an SC TagOption & return the TagOption ID
     def create_sc_tag_option(self, tag_key, tag_value):
-        self.my_status = execution_status()
+        self.my_status = ExecutionStatus()
         tag_option_id = ""
         try:
             sc_response = self.service_catalog_client.create_tag_option(
@@ -90,7 +77,7 @@ class service_catalog:
 
     # Method to update an SC TagOption & return the TagOption ID
     def update_sc_tag_option(self, tag_key, tag_value):
-        self.my_status = execution_status()
+        self.my_status = ExecutionStatus()
         tag_option_id = ""
         try:
             sc_response = self.service_catalog_client.update_tag_option(
@@ -113,8 +100,7 @@ class service_catalog:
 
     # Method to get all existing TagOptions from SC
     def get_sc_tag_options(self, **kwargs):
-        self.my_status = execution_status()
-        sc_response = dict()
+        self.my_status = ExecutionStatus()
         try:
             if kwargs.get("key"):
                 sc_response = self.service_catalog_client.list_tag_options(
@@ -138,14 +124,14 @@ class service_catalog:
 
     # Method to get all existing SC product template ID's & names
     def get_sc_product_templates(self):
-        self.my_status = execution_status()
-        sc_prod_templates_ids_names = dict()
+        self.my_status = ExecutionStatus()
+        sc_prod_templates_ids_names = {}
         try:
             sc_response = self.service_catalog_client.search_products_as_admin(
                 SortBy="Title", SortOrder="ASCENDING"
             )
             log.debug('The sc_response is: "%s"', sc_response)
-            sc_product_templates = list()
+            sc_product_templates = []
             sc_product_templates = sc_response.get("ProductViewDetails")
             for template in sc_product_templates:
                 if not re.search("^AWS", template["ProductViewSummary"].get("Owner")):
@@ -170,16 +156,14 @@ class service_catalog:
     def assign_tg_sc_product_template(
         self, tag_group_name, sc_product_template_id, **session_credentials
     ):
-        self.my_status = execution_status()
-        all_sc_tag_options = dict()
-        tag_group_contents = dict()
-        this_sc_tag_option_values_ids = dict()
+        self.my_status = ExecutionStatus()
+        this_sc_tag_option_values_ids = {}
 
         # Instantiate a service catalog class instance
-        sc_instance = service_catalog(self.region, **session_credentials)
+        sc_instance = ServiceCatalog(self.region, **session_credentials)
 
         # Get the key & values list for the requested Tag Group
-        tag_group = get_tag_groups(self.region, **session_credentials)
+        tag_group = GetTagGroups(self.region, **session_credentials)
         (
             tag_group_contents,
             tag_group_execution_status,
@@ -191,7 +175,7 @@ class service_catalog:
         )
 
         # Get the TagOption ID's of all SC TagOptions that have the same key as the Tag Group parameter
-        # If there's a key match, remember the corresponding value to determine if any Tag Group values are missing from SC
+        # If there's a key match, remember the corresponding value to determine if Tag Group values are missing from SC
         for sc_tag_option in all_sc_tag_options["TagOptionDetails"]:
             if sc_tag_option["Key"] == tag_group_contents["tag_group_key"]:
                 this_sc_tag_option_values_ids[sc_tag_option["Value"]] = sc_tag_option[
@@ -250,7 +234,7 @@ class service_catalog:
                 )
                 this_sc_tag_option_values_ids[value] = tag_option_id
 
-        product_template_details = dict()
+        product_template_details = {}
         try:
             product_template_details = (
                 self.service_catalog_client.describe_product_as_admin(
@@ -275,10 +259,10 @@ class service_catalog:
             else:
                 self.my_status.error()
 
-        existing_prod_template_tag_options = list()
+        existing_prod_template_tag_options = []
         existing_prod_template_tag_options = product_template_details.get("TagOptions")
 
-        existing_product_template_tag_option_ids = list()
+        existing_product_template_tag_option_ids = []
 
         for tag_option in existing_prod_template_tag_options:
             existing_product_template_tag_option_ids.append(tag_option.get("Id"))

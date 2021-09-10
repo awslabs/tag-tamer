@@ -1,43 +1,33 @@
-#!/usr/bin/env python3
+"""
+    Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+    SPDX-License-Identifier: MIT-0
+"""
 
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: MIT-0
-# Getter delivering Tag Group attributes.  Returns output as dictionaries & lists
-
-# Import administrative functions
-from admin import execution_status
-
-# Import AWS module for python
-import botocore
-from botocore import exceptions
-import boto3
-
-# Import Collections module to manipulate dictionaries
 import collections
-
-# Import logging module
 import logging
 
+import boto3
+import botocore
+
+from admin import ExecutionStatus
+
+# Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
+
 # Define get_tag_groups class
-class get_tag_groups:
+class GetTagGroups:
+    """Getter delivering Tag Group attributes.  Returns output as dictionaries & lists"""
 
     # Class constructor
     def __init__(self, region, **session_credentials):
-        self.my_status = execution_status()
-        self.tag_groups = dict()
+        self.my_status = ExecutionStatus()
         self.region = region
-        self.session_credentials = dict()
-        self.session_credentials["AccessKeyId"] = session_credentials.get("AccessKeyId")
-        self.session_credentials["SecretKey"] = session_credentials.get("SecretKey")
-        self.session_credentials["SessionToken"] = session_credentials.get(
-            "SessionToken"
-        )
+
         this_session = boto3.session.Session(
-            aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-            aws_secret_access_key=self.session_credentials.get("SecretKey"),
-            aws_session_token=self.session_credentials.get("SessionToken"),
+            aws_access_key_id=session_credentials.get("AccessKeyId"),
+            aws_secret_access_key=session_credentials.get("SecretKey"),
+            aws_session_token=session_credentials.get("SessionToken"),
         )
         try:
             self.dynamodb = this_session.resource("dynamodb", region_name=self.region)
@@ -54,8 +44,8 @@ class get_tag_groups:
             else:
                 self.my_status.error()
 
-    # Returns a dictionary of actual_tag_group_name:actual_tag_group_key key:value pairs
     def get_tag_group_names(self):
+        """Returns a dictionary of actual_tag_group_name:actual_tag_group_key key:value pairs"""
         tag_group_names = {}
         sorted_tag_group_names = {}
 
@@ -86,11 +76,12 @@ class get_tag_groups:
 
         return sorted_tag_group_names, self.my_status.get_status()
 
-    # Returns a dictionary of tag_group_key:actual_tag_group_key
-    # & tag_group_values:list[actual_tag_group_values] for the specified Tag Group
     def get_tag_group_key_values(self, tag_group_name):
-        tag_group_key_values = dict()
-        sorted_tag_group_values = list()
+        """Returns a dictionary of tag_group_key:actual_tag_group_key
+        & tag_group_values:list[actual_tag_group_values] for the specified Tag Group
+        """
+        tag_group_key_values = {}
+        sorted_tag_group_values = []
         try:
             get_item_response = self.table.get_item(
                 Key={"tag_group_name": tag_group_name}
@@ -119,16 +110,17 @@ class get_tag_groups:
 
         return tag_group_key_values, self.my_status.get_status()
 
-    # Returns a list of 3-item lists where every 3-item list includes actual_tag_group_name, actual_tag_group_key
-    # & a list[actual_tag_group_values]
     def get_all_tag_groups_key_values(self, region, **session_credentials):
-        all_tag_groups_info = list()
+        """Returns a list of 3-item lists where every 3-item list includes actual_tag_group_name, actual_tag_group_key
+        & a list[actual_tag_group_values]
+        """
+        all_tag_groups_info = []
 
-        inventory = get_tag_groups(region, **session_credentials)
+        inventory = GetTagGroups(region, **session_credentials)
         tag_groups_keys, status = inventory.get_tag_group_names()
 
         for tag_group_name, tag_group_key in tag_groups_keys.items():
-            this_tag_group_info = list()
+            this_tag_group_info = []
             this_tag_group_key_values, status = inventory.get_tag_group_key_values(
                 tag_group_name
             )

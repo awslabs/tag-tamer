@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: EventBridge Rule to map ECR repository creation CloudTrail events to Lambda
+Resources:
+  DetectNewEcrEventBridgeRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Detect ECR repository creation events
+      Name: detect-new-ecr-repository
+      EventPattern:
+        source:
+          - aws.ecr
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - ecr.amazonaws.com
+          eventName:
+            - CreateRepository
+      State: ENABLED
+      # Include the ARN of ECR repository tagger target Lambda function
+      Targets:
+        - Id: '1234567895'
+          Arn: RoleBasedEcrRepositoryTagger.Arn

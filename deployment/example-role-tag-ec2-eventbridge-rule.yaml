@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: EventBridge Rule to map EC2 instance creation CloudTrail events to Lambda
+Resources:
+  DetectNewEc2EventBridgeRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: Detect EC2 instance creation events
+      Name: detect-new-ec2-instance
+      EventPattern:
+        source:
+          - aws.ec2
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - ec2.amazonaws.com
+          eventName:
+            - RunInstances
+      State: ENABLED
+      # Include the ARN of EC2 tagger target Lambda function 
+      Targets:
+        - Id: "1234567890"
+          Arn: !GetAtt RoleBasedEc2Tagger.Arn

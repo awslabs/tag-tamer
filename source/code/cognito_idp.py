@@ -6,28 +6,21 @@
 # Purpose - functions to retrieve information regarding Amazon Cognito
 # user pools & users
 
-# Import administrative functions
-from admin import execution_status
-
-# Import AWS module for python
-import botocore
-from botocore import exceptions
-from botocore.exceptions import ClientError
-import boto3
-
-# Import logging module
 import logging
 
-# Import the systems module to get interpreter data
-import sys
+import boto3
+import botocore
 
+from admin import ExecutionStatus
+
+# Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
+
 
 # Function to return the authenticated user's user pool group IAM role ARN's
 def get_user_group_arns(user_name, user_pool_id, region):
     try:
-        my_status = execution_status()
-        cognito_idp_groups = dict()
+        my_status = ExecutionStatus()
         cognito_idp_client = boto3.client("cognito-idp", region_name=region)
         cognito_idp_groups = cognito_idp_client.admin_list_groups_for_user(
             Username=user_name, UserPoolId=user_pool_id
@@ -42,7 +35,7 @@ def get_user_group_arns(user_name, user_pool_id, region):
     except botocore.exceptions.ClientError as error:
         log.error(
             "Boto3 API returned error. function: {} - {}".format(
-                sys._getframe().f_code.co_name, error
+                get_user_group_arns.__name__, error
             )
         )
         my_status.error()
@@ -52,8 +45,8 @@ def get_user_group_arns(user_name, user_pool_id, region):
 
 # Inputs: cognito_id_token = user's returned id_token JWT
 def get_user_credentials(cognito_id_token, user_pool_id, identity_pool_id, region):
-    my_status = execution_status()
-    user_credentials = dict()
+    my_status = ExecutionStatus()
+    user_credentials = {}
     idp_name = "cognito-idp." + region + ".amazonaws.com/" + user_pool_id
 
     try:
@@ -63,7 +56,7 @@ def get_user_credentials(cognito_id_token, user_pool_id, identity_pool_id, regio
         )
         log.debug(
             "function: {} - Received the Cognito identity".format(
-                sys._getframe().f_code.co_name
+                get_user_credentials.__name__
             )
         )
         identity_id = identity_id_response["IdentityId"]
@@ -74,7 +67,7 @@ def get_user_credentials(cognito_id_token, user_pool_id, identity_pool_id, regio
         )
         log.debug(
             "function: {} - Received the Cognito credentials".format(
-                sys._getframe().f_code.co_name
+                get_user_credentials.__name__
             )
         )
         user_credentials["AccessKeyId"] = cognito_identity_response["Credentials"][
@@ -90,7 +83,7 @@ def get_user_credentials(cognito_id_token, user_pool_id, identity_pool_id, regio
     except botocore.exceptions.ClientError as error:
         log.error(
             "Boto3 API returned error. function: {} - {}".format(
-                sys._getframe().f_code.co_name, error
+                get_user_credentials.__name__, error
             )
         )
         my_status.error()

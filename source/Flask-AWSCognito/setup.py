@@ -15,10 +15,10 @@ with open("README.md", "r") as fh:
 setup(
     name="Flask-AWSCognito",
     version="1.2.8",
-    url="https://github.com/billdry/Flask-AWSCognito/",
+    url="https://github.com/awslabs/tag-tamer/tree/main/source/Flask-AWSCognito",
     license="MIT",
-    author="Bill Dry",
-    author_email="bdry@amazon.com",
+    author="AWS",
+    author_email="aws@amazon.com",
     description="Authenticate users with AWS Cognito",
     long_description=long_description,
     long_description_content_type="text/markdown",

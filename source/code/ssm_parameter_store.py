@@ -4,21 +4,17 @@
 # SPDX-License-Identifier: MIT-0
 # Getter & setter for AWS SSM Parameter Store
 
-# Import AWS module for python
-import botocore
-from botocore import exceptions
-import boto3
-
-# Import JSON
-import json
-
-# Import logging module
 import logging
 
+import boto3
+import botocore
+
+# Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
-# Define AWS SSM Parameter Store class to get/set items using Boto3
-class ssm_parameter_store:
+
+class SsmParameterStore:
+    """Define AWS SSM Parameter Store class to get/set items using Boto3"""
 
     # Class constructor
     def __init__(self, region):
@@ -26,14 +22,15 @@ class ssm_parameter_store:
         self.ssm_client = boto3.client("ssm", region_name=self.region)
 
     def form_parameter_hierarchies(self, ssm_parameter_path, ssm_parameter_names):
-        # List comprehension to create the fully qualified SSM parameter names
+        """List comprehension to create the fully qualified SSM parameter names"""
         parameter_list = [ssm_parameter_path + name for name in ssm_parameter_names]
         return parameter_list
 
-    # Argument: Path prefix for all SSM parameter name.  Example path prefix: /tag-tamer/
-    # Returns: SSM Parameter Dictionaries
     def ssm_get_parameter_details(self, ssm_parameter_path):
-        ssm_parameters = dict()
+        """Argument: Path prefix for all SSM parameter name.  Example path prefix: /tag-tamer/
+        Returns: SSM Parameter Dictionaries
+        """
+        ssm_parameters = {}
 
         def _get_parameter_response(**kwargs):
             try:
@@ -63,7 +60,7 @@ class ssm_parameter_store:
             log.debug("The final parameter response is: %s", ssm_parameters)
 
         _get_parameter_response()
-        parameter_dictionary = dict()
+        parameter_dictionary = {}
         for name, value in ssm_parameters.items():
             # Remove the path prepending the SSM Parameter name
             name_components = name.split("/")

@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: EventBridge Rule to map Lambda function creation CloudTrail events to Lambda
+Resources:
+  DetectNewLambdaEventBridgeRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Detect Lambda function creation events
+      Name: detect-new-lambda-function
+      EventPattern:
+        source:
+          - aws.lambda
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - lambda.amazonaws.com
+          eventName:
+            - CreateFunction20150331
+      State: ENABLED
+      # Include the ARN of your target Lambda function e.g. role-based-lambda-function-tagger.py
+      Targets:
+        - Id: '1234567893'
+          Arn: !GetAtt RoleBasedLambdaFunctionTagger.Arn

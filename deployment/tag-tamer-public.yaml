@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: (SO0132) AWS CloudFormation template for Tag Tamer solution components - (Version v1.0.0 )
+Description: (SO0132) AWS Cloudformation template for Tag Tamer solution components - (Version %%VERSION%% )
 
 Metadata: 
   AWS::CloudFormation::Interface: 
@@ -18,7 +18,6 @@ Metadata:
       - Label:
           default: "Amazon Cognito User Pool configuration for Authentication"
         Parameters: 
-          - Email
           - TagTamerUserPoolName
       - Label:
           default: "Amazon Cognito Identity Pool configuration"
@@ -52,9 +51,6 @@ Parameters:
       Name of the certificate to use for ALB SSL connections.
       Example: arn:aws:acm-pca:region:account:certificate-authority/resource-identifier
     Type: String
-  Email:
-    Type: String
-    Description: Source email address for sending emails to new users.  Must be an SES validated address.
   TagTamerUserPoolName:
     Type: String
     Default: tag_tamer_user_pool
@@ -443,7 +439,6 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
-            # VolumeType: gp2
             VolumeType: gp3
             VolumeSize: 8
             DeleteOnTermination: true
@@ -451,22 +446,30 @@ Resources:
       SecurityGroupIds:
         - !GetAtt "InstanceSecurityGroup.GroupId"
       ImageId: !Ref AMIID
-      #KeyName: !Ref KeyName
+      # KeyName: !Ref KeyName
       SubnetId: !Ref PrivateSubnetA
       IamInstanceProfile: !Ref TagTamerInstanceProfile
       UserData:
         Fn::Base64:
-          !Sub |
+          !Sub
+          - |
             #!/bin/bash -xe
             cd /var/tmp
-            yum -y install git dos2unix
-            git clone --branch release/v1.0.0 https://github.com/awslabs/tag-tamer.git
+            yum -y install dos2unix wget unzip
+            mkdir -p /var/tmp/tag-tamer
+            wget --output-document=/tmp/webapp.zip https://${S3Bucket}-${AWS::Region}.s3.amazonaws.com/${KeyPrefix}/webapp.zip
+            unzip -q -d /var/tmp/tag-tamer /tmp/webapp.zip
+            rm /tmp/webapp.zip
             cd /var/tmp/tag-tamer/source/code
             dos2unix tag_tamer_parameters.json
             sed -i -e 's/"base_region": "us-east-1",/"base_region": "${AWS::Region}",/' tag_tamer_parameters.json
+            cd /var/tmp/tag-tamer/source/code/templates
+            sed -i 's/TAG_TAMER_EC2_INSTANCE_IP_DNS/${PublicLoadBalancer.DNSName}/g' *.html
             cd /var/tmp/tag-tamer/source
             dos2unix tagtamer-install.sh
             bash tagtamer-install.sh
+          - S3Bucket: !FindInMap [SourceCode, General, S3Bucket]
+            KeyPrefix: !FindInMap [SourceCode, General, KeyPrefix]
       Tags:
         - Key: Name
           Value: Tag Tamer Web App
@@ -559,11 +562,6 @@ Resources:
         ChallengeRequiredOnNewDevice: false
         DeviceOnlyRememberedOnUserPrompt: true
       EmailConfiguration:
-        SourceArn: !Sub 
-          - 'arn:aws:ses:${MyRegion}:${MyAccountID}:identity/${EmailAddress}'
-          - MyRegion: !Ref 'AWS::Region'
-            MyAccountID: !Ref 'AWS::AccountId'
-            EmailAddress: !Ref Email
         EmailSendingAccount: COGNITO_DEFAULT
       EmailVerificationMessage: 'Your Tag Tamer verification code is {####}. '
       EmailVerificationSubject: Your Tag Tamer verification code

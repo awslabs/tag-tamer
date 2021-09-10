@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: EventBridge Rule to map RDS instance creation CloudTrail events to Lambda
+Resources:
+  DetectNewRdsEventBridgeRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Detect RDS instance creation events
+      Name: detect-new-rds-instance
+      EventPattern:
+        source:
+          - aws.rds
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - rds.amazonaws.com
+          eventName:
+            - CreateDBInstance
+      State: ENABLED
+      # Include the ARN of RDS instance tagger target Lambda function
+      Targets:
+        - Id: '1234567892'
+          Arn: !GetAtt RoleBasedRdsInstanceTagger.Arn

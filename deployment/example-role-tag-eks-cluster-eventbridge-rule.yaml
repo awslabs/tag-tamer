@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: EventBridge Rule to map EKS cluster creation CloudTrail events to Lambda
+Resources:
+  DetectNewEksClusterEventBridgeRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Detect EKS cluster creation events
+      Name: detect-new-eks-cluster
+      EventPattern:
+        source:
+          - aws.eks
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - eks.amazonaws.com
+          eventName:
+            - CreateCluster
+      State: ENABLED
+      # Include the ARN of EKS Cluster tagger target Lambda function
+      Targets:
+        - Id: '1234567894'
+          Arn: !GetAtt RoleBasedEksClusterTagger.Arn

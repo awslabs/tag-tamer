@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: EventBridge Rule to map S3 bucket creation CloudTrail events to Lambda
+Resources:
+  DetectNewS3BucketEventBridgeRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: Detect S3 bucket creation events
+      Name: detect-new-s3-bucket
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - CreateBucket
+      State: ENABLED
+      # Include the ARN of S3 bucket tagger target Lambda function
+      Targets:
+        - Id: '1234567891'
+          Arn: !GetAtt RoleBasedS3BucketTagger.Arn

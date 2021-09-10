@@ -6,318 +6,93 @@
 # Getters & Setters for AWS EKS Clusters resource tags
 #  This class supports the main "resources_tags" class
 # Included class & methods
-# class - eks_clusters_tags
+# class - EksClustersTags
 #  method - get_eks_clusters_ids
 #  method - get_eks_clusters_tags
 #  method - get_eks_clusters_keys
 #  method - get_eks_clusters_values
 #  method - set_eks_clusters_tags
 
-# Import administrative functions
-from admin import execution_status
-
-# Import AWS module for python
-import boto3, botocore
-from botocore import exceptions
-from botocore.exceptions import ClientError
-
-# Import collections to use ordered dictionaries for storage
+import logging
+import re
 from collections import OrderedDict
 
-# Import logging module
-import logging
+import boto3
+import botocore
 
-# Import Python's regex module to filter Boto3's API responses
-import re
-
-# Import the systems module to get interpreter data
-import sys
+from admin import ExecutionStatus, get_boto3_client_session
+from tag_utilities import tag_filter_matcher, get_tag_filter_key_value_states
 
 # Instantiate logging for this module using its file name
 log = logging.getLogger(__name__)
 
-# Define resources_tags class to get/set resources & their assigned tags
-class eks_clusters_tags:
+
+class EksClustersTags:
+    """Define resources_tags class to get/set resources & their assigned tags"""
 
     # Class constructor
     def __init__(self, resource_type, region):
         self.resource_type = resource_type
         self.region = region
 
-    # Returns a filtered list of all resource names & ID's for the resource type specified
     def get_eks_clusters_ids(self, filter_tags, **session_credentials):
-        my_status = execution_status()
-        self.filter_tags = filter_tags
-        tag_key1_state = True if self.filter_tags.get("tag_key1") else False
-        tag_value1_state = True if self.filter_tags.get("tag_value1") else False
-        tag_key2_state = True if self.filter_tags.get("tag_key2") else False
-        tag_value2_state = True if self.filter_tags.get("tag_value2") else False
-        if not self.filter_tags.get("conjunction"):
-            self.filter_tags["conjunction"] = "AND"
-        resource_inventory = dict()
+        """Returns a filtered list of all resource names & ID's for the resource type specified"""
+        my_status = ExecutionStatus()
+        (
+            tag_key1_state,
+            tag_value1_state,
+            tag_key2_state,
+            tag_value2_state,
+        ) = get_tag_filter_key_value_states(filter_tags=filter_tags)
+        if not filter_tags.get("conjunction"):
+            filter_tags["conjunction"] = "AND"
+        resource_inventory = {}
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
-
-        def _intersection_union_invalid(tag_dict, cluster_name, cluster_arn):
-            resource_inventory["No matching resource"] = "No matching resource"
-
-        if self.filter_tags.get("conjunction") == "AND":
-
-            def _intersection_tfff(tag_dict, cluster_name, cluster_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    resource_inventory[cluster_arn] = cluster_name
-
-            def _intersection_fftf(tag_dict, cluster_name, cluster_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    resource_inventory[cluster_arn] = cluster_name
-
-            def _intersection_fftt(tag_dict, cluster_name, cluster_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key2")
-                    ) == self.filter_tags.get("tag_value2"):
-                        resource_inventory[cluster_arn] = cluster_name
-
-            def _intersection_ttff(tag_dict, cluster_name, cluster_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key1")
-                    ) == self.filter_tags.get("tag_value1"):
-                        resource_inventory[cluster_arn] = cluster_name
-
-            def _intersection_tftf(tag_dict, cluster_name, cluster_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    resource_inventory[cluster_arn] = cluster_name
-
-            def _intersection_tftt(tag_dict, cluster_name, cluster_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key2")
-                    ) == self.filter_tags.get("tag_value2"):
-                        resource_inventory[cluster_arn] = cluster_name
-
-            def _intersection_tttf(tag_dict, cluster_name, cluster_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key1")
-                    ) == self.filter_tags.get("tag_value1"):
-                        resource_inventory[cluster_arn] = cluster_name
-
-            def _intersection_tttt(tag_dict, cluster_name, cluster_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    and self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    if tag_dict.get(
-                        self.filter_tags.get("tag_key1")
-                    ) == self.filter_tags.get("tag_value1"):
-                        if tag_dict.get(
-                            self.filter_tags.get("tag_key2")
-                        ) == self.filter_tags.get("tag_value2"):
-                            resource_inventory[cluster_arn] = cluster_name
-
-            def _intersection_ffff(tag_dict, cluster_name, cluster_arn):
-                resource_inventory[cluster_arn] = cluster_name
-
-            # "AND" Truth table check for tag_key1, tag_value1, tag_key2, tag_value2
-            intersection_combos = {
-                (False, False, False, True): _intersection_union_invalid,
-                (False, True, False, False): _intersection_union_invalid,
-                (False, True, False, True): _intersection_union_invalid,
-                (True, False, False, True): _intersection_union_invalid,
-                (True, True, False, True): _intersection_union_invalid,
-                (False, True, True, False): _intersection_union_invalid,
-                (False, False, True, False): _intersection_fftf,
-                (False, False, True, True): _intersection_fftt,
-                (True, False, False, False): _intersection_tfff,
-                (True, True, False, False): _intersection_ttff,
-                (True, False, True, False): _intersection_tftf,
-                (True, False, True, True): _intersection_tftt,
-                (True, True, True, False): _intersection_tttf,
-                (True, True, True, True): _intersection_tttt,
-                (False, False, False, False): _intersection_ffff,
-            }
-
-            try:
-                # client = this_session.client(self.resource_type, region_name=self.region)
-                # Get all the EKS Clusters in the region
-                my_clusters = client.list_clusters()
+        try:
+            # client = this_session.client(self.resource_type, region_name=self.region)
+            # Get all the EKS Clusters in the region
+            my_clusters = client.list_clusters()
+            if my_clusters.get("clusters"):
                 for item in my_clusters["clusters"]:
-                    eks_cluster_arn = client.describe_cluster(name=item)["cluster"][
-                        "arn"
-                    ]
                     try:
+                        eks_cluster_arn = client.describe_cluster(name=item)["cluster"][
+                            "arn"
+                        ]
                         # Get all the tags for a given EKS Cluster
                         response = client.list_tags_for_resource(
                             resourceArn=eks_cluster_arn
                         )
-                    except botocore.exceptions.ClientError as error:
-                        log.error("Boto3 API returned error: {}".format(error))
                         if (
-                            error.response["Error"]["Code"] == "AccessDeniedException"
-                            or error.response["Error"]["Code"]
-                            == "UnauthorizedOperation"
-                        ):
-                            my_status.error(
-                                message="You are not authorized to view these resources"
+                            filter_tags.get("tag_key1") == "<No tags applied>"
+                            or filter_tags.get("tag_key2") == "<No tags applied>"
+                        ) and not response.get("tags"):
+                            resource_inventory[eks_cluster_arn] = item
+                        elif response.get("tags"):
+                            tag_filter_matcher(
+                                conjunction=filter_tags.get("conjunction"),
+                                tag_key1_state=tag_key1_state,
+                                tag_value1_state=tag_value1_state,
+                                tag_key2_state=tag_key2_state,
+                                tag_value2_state=tag_value2_state,
+                                resource_inventory=resource_inventory,
+                                filter_tags=filter_tags,
+                                tag_dict=response.get("tags"),
+                                resource_name=item,
+                                resource_arn=eks_cluster_arn,
                             )
-                        else:
-                            my_status.error()
-                    if response.get("tags"):
-                        intersection_combos[
-                            (
-                                tag_key1_state,
-                                tag_value1_state,
-                                tag_key2_state,
-                                tag_value2_state,
-                            )
-                        ](response.get("tags"), item, eks_cluster_arn)
-                    elif (
-                        self.filter_tags.get("tag_key1") == "<No tags applied>"
-                        or self.filter_tags.get("tag_key2") == "<No tags applied>"
-                    ):
-                        resource_inventory[eks_cluster_arn] = item
-                my_status.success(message="Resources and tags found!")
-            except botocore.exceptions.ClientError as error:
-                log.error("Boto3 API returned error: {}".format(error))
-                if (
-                    error.response["Error"]["Code"] == "AccessDeniedException"
-                    or error.response["Error"]["Code"] == "UnauthorizedOperation"
-                ):
-                    my_status.error(
-                        message="You are not authorized to view these resources"
-                    )
-                else:
-                    my_status.error()
-
-        if self.filter_tags.get("conjunction") == "OR":
-
-            def _union_tfff_tftf_fftf(tag_dict, cluster_name, cluster_arn):
-                if (
-                    self.filter_tags.get("tag_key1") in tag_dict
-                    or self.filter_tags.get("tag_key2") in tag_dict
-                ):
-                    #print(cluster_name)
-                    #print(self.filter_tags.get("tag_key1"))
-                    #print(self.filter_tags.get("tag_key2"))
-                    #print(tag_dict)
-                    resource_inventory[cluster_arn] = cluster_name
-
-            def _union_tttf(tag_dict, cluster_name, cluster_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key1")
-                    ] == self.filter_tags.get("tag_value1"):
-                        resource_inventory[cluster_arn] = cluster_name
-                elif self.filter_tags.get("tag_key2") in tag_dict:
-                    resource_inventory[cluster_arn] = cluster_name
-
-            def _union_tftt(tag_dict, cluster_name, cluster_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key2")
-                    ] == self.filter_tags.get("tag_value2"):
-                        resource_inventory[cluster_arn] = cluster_name
-                elif self.filter_tags.get("tag_key1") in tag_dict:
-                    resource_inventory[cluster_arn] = cluster_name
-
-            def _union_fftt(tag_dict, cluster_name, cluster_arn):
-                if self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key2")
-                    ] == self.filter_tags.get("tag_value2"):
-                        resource_inventory[cluster_arn] = cluster_name
-
-            def _union_ttff(tag_dict, cluster_name, cluster_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key1")
-                    ] == self.filter_tags.get("tag_value1"):
-                        resource_inventory[cluster_arn] = cluster_name
-
-            def _union_tttt(tag_dict, cluster_name, cluster_arn):
-                if self.filter_tags.get("tag_key1") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key1")
-                    ] == self.filter_tags.get("tag_value1"):
-                        resource_inventory[cluster_arn] = cluster_name
-                elif self.filter_tags.get("tag_key2") in tag_dict:
-                    if tag_dict[
-                        self.filter_tags.get("tag_key2")
-                    ] == self.filter_tags.get("tag_value2"):
-                        resource_inventory[cluster_arn] = cluster_name
-
-            def _union_ffff(tag_dict, cluster_name, cluster_arn):
-                resource_inventory[cluster_arn] = cluster_name
-
-            # "OR" Truth table check for tag_key1, tag_value1, tag_key2, tag_value2
-            or_combos = {
-                (False, False, False, True): _intersection_union_invalid,
-                (False, True, False, False): _intersection_union_invalid,
-                (False, True, False, True): _intersection_union_invalid,
-                (False, True, True, True): _intersection_union_invalid,
-                (True, True, False, True): _intersection_union_invalid,
-                (False, False, True, False): _union_tfff_tftf_fftf,
-                (False, False, True, True): _union_fftt,
-                (True, False, False, False): _union_tfff_tftf_fftf,
-                (True, False, True, False): _union_tfff_tftf_fftf,
-                (True, False, True, True): _union_tftt,
-                (True, True, False, False): _union_ttff,
-                (True, True, True, False): _union_tttf,
-                (True, True, True, True): _union_tttt,
-                (False, False, False, False): _union_ffff,
-            }
-
-            try:
-                # client = this_session.client(self.resource_type, region_name=self.region)
-                # Get all the EKS Clusters in the region
-                my_clusters = client.list_clusters()
-                for item in my_clusters["clusters"]:
-                    eks_cluster_arn = client.describe_cluster(name=item)["cluster"][
-                        "arn"
-                    ]
-                    try:
-                        # Get all the tags for a given EKS Cluster
-                        response = client.list_tags_for_resource(
-                            resourceArn=eks_cluster_arn
-                        )
-                        if response.get("tags"):
-                            or_combos[
-                                (
-                                    tag_key1_state,
-                                    tag_value1_state,
-                                    tag_key2_state,
-                                    tag_value2_state,
-                                )
-                            ](response.get("tags"), item, eks_cluster_arn)
                         elif (
-                            self.filter_tags.get("tag_key1") == "<No tags applied>"
-                            or self.filter_tags.get("tag_key2") == "<No tags applied>"
+                            not tag_key1_state
+                            and not tag_value1_state
+                            and not tag_key2_state
+                            and not tag_value2_state
                         ):
                             resource_inventory[eks_cluster_arn] = item
-
                     except botocore.exceptions.ClientError as error:
                         log.error("Boto3 API returned error: {}".format(error))
                         if (
@@ -331,17 +106,20 @@ class eks_clusters_tags:
                         else:
                             my_status.error()
                 my_status.success(message="Resources and tags found!")
-            except botocore.exceptions.ClientError as error:
-                log.error("Boto3 API returned error: {}".format(error))
-                if (
-                    error.response["Error"]["Code"] == "AccessDeniedException"
-                    or error.response["Error"]["Code"] == "UnauthorizedOperation"
-                ):
-                    my_status.error(
-                        message="You are not authorized to view these resources"
-                    )
-                else:
-                    my_status.error()
+            # If no EKS cluster resources found
+            else:
+                my_status.warning(message="No resources and tags found!")
+        except botocore.exceptions.ClientError as error:
+            log.error("Boto3 API returned error: {}".format(error))
+            if (
+                error.response["Error"]["Code"] == "AccessDeniedException"
+                or error.response["Error"]["Code"] == "UnauthorizedOperation"
+            ):
+                my_status.error(
+                    message="You are not authorized to view these resources"
+                )
+            else:
+                my_status.error()
 
         return resource_inventory, my_status.get_status()
 
@@ -349,29 +127,20 @@ class eks_clusters_tags:
     # Returns a nested dictionary of every resource & its key:value tags for the chosen resource type
     # No input arguments
     def get_eks_clusters_tags(self, chosen_resources, **session_credentials):
-        my_status = execution_status()
+        my_status = ExecutionStatus()
         # Instantiate dictionaries to hold resources & their tags
-        tagged_resource_inventory = dict()
+        tagged_resource_inventory = {}
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         try:
-            if chosen_resources[0][0] != "No matching resources found":
+            if chosen_resources:
                 for resource_id_name in chosen_resources:
-                    resource_tags = dict()
+                    resource_tags = {}
                     eks_cluster_arn = client.describe_cluster(name=resource_id_name[1])[
                         "cluster"
                     ]["arn"]
@@ -434,23 +203,14 @@ class eks_clusters_tags:
     # Getter method retrieves every tag:key for object's resource type
     # No input arguments
     def get_eks_clusters_keys(self, **session_credentials):
-        my_status = execution_status()
-        tag_keys_inventory = list()
+        my_status = ExecutionStatus()
+        tag_keys_inventory = []
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         try:
             # Get all the EKS clusters in the region
@@ -513,23 +273,14 @@ class eks_clusters_tags:
     # Getter method retrieves every tag:value for object's resource type
     # No input arguments
     def get_eks_clusters_values(self, **session_credentials):
-        my_status = execution_status()
-        tag_values_inventory = list()
+        my_status = ExecutionStatus()
+        tag_values_inventory = []
 
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         try:
             # Get all the EKS clusters in the region
@@ -612,26 +363,17 @@ class eks_clusters_tags:
     def set_eks_clusters_tags(
         self, resources_to_tag, chosen_tags, **session_credentials
     ):
-        my_status = execution_status()
-        resources_updated_tags = dict()
-        tag_dict = dict()
+        my_status = ExecutionStatus()
+        resources_updated_tags = {}
+        tag_dict = {}
 
         self.resources_to_tag = resources_to_tag
         self.chosen_tags = chosen_tags
-        self.session_credentials = dict()
-        self.session_credentials = session_credentials
-
-        if session_credentials.get("multi_account_role_session"):
-            client = session_credentials["multi_account_role_session"].client(
-                self.resource_type, region_name=self.region
-            )
-        else:
-            this_session = boto3.session.Session(
-                aws_access_key_id=self.session_credentials.get("AccessKeyId"),
-                aws_secret_access_key=self.session_credentials.get("SecretKey"),
-                aws_session_token=self.session_credentials.get("SessionToken"),
-            )
-            client = this_session.client(self.resource_type, region_name=self.region)
+        client, _ = get_boto3_client_session(
+            session_credentials=session_credentials,
+            resource_type=self.resource_type,
+            region=self.region,
+        )
 
         # for EKS Boto3 API convert list of tags dicts to single key:value tag dict
         for tag in self.chosen_tags:
