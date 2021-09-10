@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2021-09-09
+
+### Added 
+
+- Example AWS Lambda function python files to tag newly created EC2 instances, ECR repositories, EKS clusters,
+Lambda functions, RDS instances and S3 buckets.  These python files are in the source/code/ folder.
+- Example AWS CloudFormation templates to create Amazon Event Bridge rules for each of these 6 resource types
+are also included.  These templates are in the "deployment" folder.
+- Installs & serves all css & js web UI files from the Tag Tamer web app EC2 instance.
+
+### Changed
+
+- Centralized common resource tag filter matching functions in the tag_utilities.py file
+- Centralized Boto3 client and session creation as a function in the admin.py file
+- Python Class names changes to CapWords format
+- Simplified variable initialization
+
 ## [1.0.0] - 2021-04-01
 
 ### Added
