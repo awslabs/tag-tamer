@@ -9,4 +9,4 @@ Tag Tamer is a solution to manage, correct and enforce resource tagging on exist
 
 ## Current branch
 
-[release/v.1.0.1](https://github.com/awslabs/tag-tamer/tree/release/v1.0.1)
+[release/v1.0.1](https://github.com/awslabs/tag-tamer/tree/release/v1.0.1)
