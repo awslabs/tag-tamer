@@ -19,7 +19,7 @@ are also included.  These templates are in the "deployment" folder.
 
 - Centralized common resource tag filter matching functions in the tag_utilities.py file
 - Centralized Boto3 client and session creation as a function in the admin.py file
-- Python Class names changes to CapWords format
+- Python Class names changes to CapWords format.
 - Simplified variable initialization
 
 ## [1.0.0] - 2021-04-01
